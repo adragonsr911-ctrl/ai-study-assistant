@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI智能学习助手 · 你的专属AI学习辅导老师</title>
+  <meta name="description" content="AI智能学习助手：AI答疑、知识点拆解、学习计划、错题本、艾宾浩斯智能复习、学习看板与AI诊断，构建学—练—测—复习完整学习闭环。">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232563eb'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' transform='scale(0.66) translate(6.2,6.2)'%3E%3Cpath d='M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z'/%3E%3Cpath d='M22 10v6'/%3E%3Cpath d='M6 12.5V16a6 3 0 0 0 12 0v-3.5'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css?v=20261020">
+  <!-- 代码高亮（本地化，离线可用） -->
+  <link rel="stylesheet" href="vendor/css/github.min.css">
+  <script src="vendor/js/highlight.min.js"></script>
+  <!-- Markdown渲染库（本地化，离线可用） -->
+  <script src="vendor/js/marked.min.js"></script>
+</head>
+<body>
+  <!-- 产品落地页 -->
+  <div id="landing-page" class="landing-page hidden">
+    <header class="landing-nav">
+      <div class="landing-nav-inner">
+        <div class="logo">
+          <span class="logo-icon" data-icon="graduation-cap"></span>
+          <span>AI智能学习助手</span>
+        </div>
+        <nav class="landing-nav-links">
+          <a href="#landing-features">功能</a>
+          <a href="#landing-loop">学习闭环</a>
+          <a href="#landing-about">关于</a>
+        </nav>
+        <div class="landing-nav-actions">
+          <button class="btn-ghost" onclick="showAuthPage()">登录</button>
+          <button class="btn-primary" onclick="showAuthPage();switchAuthTab('register')">免费开始</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="landing-hero">
+      <div class="landing-hero-inner">
+        <div class="landing-hero-text">
+          <h1>让 AI 陪你走完从学到复习的每一步</h1>
+          <p>AI答疑、知识点拆解、学习计划、错题本、艾宾浩斯智能复习、学习看板与AI诊断，七大功能构建学—练—测—复习完整闭环。</p>
+          <div class="landing-hero-cta">
+            <button class="btn-primary btn-lg" onclick="showAuthPage();switchAuthTab('register')">立即开始</button>
+            <a class="btn-text" href="#landing-features">了解功能</a>
+          </div>
+        </div>
+        <div class="landing-hero-mockup">
+          <div class="mockup-window">
+            <div class="mockup-titlebar">
+              <span class="mockup-dot"></span><span class="mockup-dot"></span><span class="mockup-dot"></span>
+            </div>
+            <div class="mockup-body">
+              <div class="mockup-msg mockup-msg-ai">
+                <span class="mockup-avatar" data-icon="graduation-cap"></span>
+                <div class="mockup-bubble">你好！我是你的AI学习辅导老师，有什么问题尽管问我。</div>
+              </div>
+              <div class="mockup-msg mockup-msg-user">
+                <div class="mockup-bubble">帮我讲解一下牛顿第二定律</div>
+              </div>
+              <div class="mockup-msg mockup-msg-ai">
+                <span class="mockup-avatar" data-icon="graduation-cap"></span>
+                <div class="mockup-bubble">牛顿第二定律：物体加速度的大小跟作用力成正比，跟物体的质量成反比，方向跟合外力方向相同。</div>
+              </div>
+              <div class="mockup-input">
+                <span>输入你的问题...</span>
+                <span class="mockup-send" data-icon="send"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="landing-features" class="landing-section">
+      <div class="landing-section-inner">
+        <h2 class="landing-section-title">七大功能，覆盖学习全流程</h2>
+        <div class="landing-features-grid">
+          <div class="landing-feature">
+            <span class="landing-feature-icon" data-icon="messages-square"></span>
+            <div><h3>AI答疑</h3><p>随时提问，AI 详细解答各学科问题，讲解思路和方法。</p></div>
+          </div>
+          <div class="landing-feature">
+            <span class="landing-feature-icon" data-icon="book-open"></span>
+            <div><h3>知识点拆解</h3><p>输入一个主题，AI 自动拆解为结构化知识点，层层深入。</p></div>
+          </div>
+          <div class="landing-feature">
+            <span class="landing-feature-icon" data-icon="calendar-days"></span>
+            <div><h3>学习计划</h3><p>告诉 AI 科目和考试日期，自动生成每日学习计划。</p></div>
+          </div>
+          <div class="landing-feature">
+            <span class="landing-feature-icon" data-icon="notebook-pen"></span>
+            <div><h3>错题本</h3><p>记录错题，AI 自动分析错误原因并生成类似练习题。</p></div>
+          </div>
+          <div class="landing-feature">
+            <span class="landing-feature-icon" data-icon="repeat"></span>
+            <div><h3>艾宾浩斯复习</h3><p>基于遗忘曲线自动安排复习时间，错题不再一错再错。</p></div>
+          </div>
+          <div class="landing-feature">
+            <span class="landing-feature-icon" data-icon="chart-column"></span>
+            <div><h3>学习看板</h3><p>可视化学习数据，答题次数、错题掌握率、学习天数一目了然。</p></div>
+          </div>
+          <div class="landing-feature">
+            <span class="landing-feature-icon" data-icon="stethoscope"></span>
+            <div><h3>AI诊断</h3><p>综合错题和学习数据，AI 生成个性化学习诊断报告。</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="landing-loop" class="landing-section landing-section-alt">
+      <div class="landing-section-inner">
+        <h2 class="landing-section-title">学—练—测—复习，闭环不遗漏</h2>
+        <div class="landing-loop">
+          <div class="loop-step"><span class="loop-num">学</span><p>AI答疑 · 知识点拆解</p></div>
+          <span class="loop-arrow" data-icon="arrow-right"></span>
+          <div class="loop-step"><span class="loop-num">练</span><p>个性化学习计划</p></div>
+          <span class="loop-arrow" data-icon="arrow-right"></span>
+          <div class="loop-step"><span class="loop-num">测</span><p>错题本记录</p></div>
+          <span class="loop-arrow" data-icon="arrow-right"></span>
+          <div class="loop-step"><span class="loop-num">复习</span><p>艾宾浩斯智能复习</p></div>
+          <span class="loop-arrow" data-icon="arrow-right"></span>
+          <div class="loop-step"><span class="loop-num">诊断</span><p>AI诊断 · 学习看板</p></div>
+        </div>
+
+        <div class="landing-loop-value">
+          <div class="loop-value-item">
+            <span class="loop-value-icon" data-icon="target"></span>
+            <div>
+              <h4>学练结合</h4>
+              <p>输入知识后立即通过学习计划巩固，告别"学完就忘"的无效学习。</p>
+            </div>
+          </div>
+          <div class="loop-value-item">
+            <span class="loop-value-icon" data-icon="clipboard-x"></span>
+            <div>
+              <h4>精准查漏</h4>
+              <p>错题自动归类，AI 分析错误原因并生成类似练习题，薄弱点不遗漏。</p>
+            </div>
+          </div>
+          <div class="loop-value-item">
+            <span class="loop-value-icon" data-icon="repeat"></span>
+            <div>
+              <h4>科学复习</h4>
+              <p>艾宾浩斯遗忘曲线自动安排复习时间，到点提醒，不再一错再错。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="landing-about" class="landing-section">
+      <div class="landing-section-inner">
+        <h2 class="landing-section-title">关于本项目</h2>
+        <div class="landing-about-grid">
+          <div class="landing-about-desc">
+            <p>AI智能学习助手是一款基于大语言模型的智能学习辅助平台，旨在帮助大学生构建从学到复习的完整学习闭环。项目覆盖AI答疑、知识点拆解、学习计划、错题本、艾宾浩斯智能复习、学习看板与AI诊断七大核心功能，所有前端资源均已本地化，离线环境下也可完整演示。</p>
+          </div>
+          <div class="landing-about-info">
+            <div class="about-item">
+              <span class="about-label">技术栈</span>
+              <span class="about-value">Node.js · Express · SQLite · 原生 HTML/CSS/JS · 大语言模型 API</span>
+            </div>
+            <div class="about-item">
+              <span class="about-label">参赛团队</span>
+              <span class="about-value">智页团队 · 岭南师范学院</span>
+            </div>
+            <div class="about-item">
+              <span class="about-label">参赛赛事</span>
+              <span class="about-value">第九届传智杯全国大学生数智创新与 AI 应用大赛</span>
+            </div>
+            <div class="about-item">
+              <span class="about-label">参赛赛道</span>
+              <span class="about-value">AI WEB 网页开发 · 本科 B 组</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-cta">
+      <div class="landing-cta-inner">
+        <h2>现在开始，让学习更有章法</h2>
+        <p>注册即可免费使用全部功能，无需付费。</p>
+        <button class="btn-primary btn-lg btn-light" onclick="showAuthPage();switchAuthTab('register')">免费注册</button>
+      </div>
+    </section>
+
+    <footer class="landing-footer">
+      <div class="landing-footer-inner">
+        <div class="landing-footer-brand">
+          <div class="logo">
+            <span class="logo-icon" data-icon="graduation-cap"></span>
+            <span>AI智能学习助手</span>
+          </div>
+          <p>基于大语言模型的智能学习辅助平台，构建学—练—测—复习完整学习闭环。</p>
+        </div>
+        <div class="landing-footer-meta">
+          <p>智页团队 · 第九届传智杯全国大学生数智创新与AI应用大赛</p>
+          <p>© 2026 AI智能学习助手</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 登录/注册页面 -->
+  <div id="auth-page" class="auth-page">
+    <div class="auth-container">
+      <div class="auth-header">
+        <div class="logo">
+          <span class="logo-icon" data-icon="graduation-cap"></span>
+          <h1>AI智能学习助手</h1>
+        </div>
+        <p class="auth-subtitle">你的专属AI学习辅导老师</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="tab-btn active" data-tab="login">登录</button>
+        <button class="tab-btn" data-tab="register">注册</button>
+      </div>
+
+      <!-- 登录表单 -->
+      <form id="login-form" class="auth-form active">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="login-username" placeholder="请输入用户名" required>
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="login-password" placeholder="请输入密码" required>
+        </div>
+        <div class="forgot-row">
+          <span class="link" id="forgot-password-link">忘记密码？</span>
+        </div>
+        <button type="submit" class="btn-primary btn-block">登 录</button>
+        <p class="auth-tip">还没有账号？<span class="link" data-switch="register">立即注册</span></p>
+      </form>
+
+      <!-- 注册表单 -->
+      <form id="register-form" class="auth-form">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="register-username" placeholder="3-20个字符" required>
+        </div>
+        <div class="form-group">
+          <label>昵称（可选）</label>
+          <input type="text" id="register-nickname" placeholder="给自己起个昵称">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="register-password" placeholder="至少6位" required>
+        </div>
+        <div class="form-group">
+          <label>安全问题（用于找回密码）</label>
+          <select id="register-security-question" required>
+            <option value="">请选择安全问题</option>
+            <option value="你的母校是？">你的母校是？</option>
+            <option value="你的出生地是？">你的出生地是？</option>
+            <option value="你最喜欢的颜色是？">你最喜欢的颜色是？</option>
+            <option value="你的宠物名字是？">你的宠物名字是？</option>
+            <option value="你父亲的名字是？">你父亲的名字是？</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>安全答案</label>
+          <input type="text" id="register-security-answer" placeholder="请输入安全问题的答案" required>
+        </div>
+        <button type="submit" class="btn-primary btn-block">注 册</button>
+        <p class="auth-tip">已有账号？<span class="link" data-switch="login">去登录</span></p>
+      </form>
+
+      <!-- 忘记密码面板 -->
+      <div id="forgot-password-form" class="auth-form">
+        <!-- 第一步：输入用户名 -->
+        <div id="forgot-step-1">
+          <h3 class="auth-form-title">找回密码</h3>
+          <p class="auth-form-desc">通过注册时设置的安全问题验证身份后重置密码</p>
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" id="forgot-username" placeholder="请输入注册时的用户名">
+          </div>
+          <button type="button" class="btn-primary btn-block" id="forgot-next-btn">下一步</button>
+          <p class="auth-tip"><span class="link" id="forgot-back-login">返回登录</span></p>
+        </div>
+        <!-- 第二步：回答安全问题 + 设置新密码 -->
+        <div id="forgot-step-2" style="display:none;">
+          <h3 class="auth-form-title">重置密码</h3>
+          <div class="form-group">
+            <label>安全问题</label>
+            <input type="text" id="forgot-question" readonly>
+          </div>
+          <div class="form-group">
+            <label>安全答案</label>
+            <input type="text" id="forgot-answer" placeholder="请输入安全问题的答案">
+          </div>
+          <div class="form-group">
+            <label>新密码</label>
+            <input type="password" id="forgot-new-password" placeholder="至少6位">
+          </div>
+          <button type="button" class="btn-primary btn-block" id="forgot-reset-btn">确认重置</button>
+          <p class="auth-tip"><span class="link" id="forgot-back-step1">上一步</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主应用页面 -->
+  <div id="main-app" class="main-app hidden">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon" data-icon="graduation-cap"></span>
+        <span class="logo-text">AI学习助手</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-item active" data-view="chat">
+          <span class="nav-icon" data-icon="messages-square"></span>
+          <span class="nav-text">AI答疑</span>
+        </div>
+        <div class="nav-item" data-view="knowledge">
+          <span class="nav-icon" data-icon="book-open"></span>
+          <span class="nav-text">知识点拆解</span>
+        </div>
+        <div class="nav-item" data-view="plan">
+          <span class="nav-icon" data-icon="calendar-days"></span>
+          <span class="nav-text">学习计划</span>
+        </div>
+        <div class="nav-item" data-view="mistake">
+          <span class="nav-icon" data-icon="notebook-pen"></span>
+          <span class="nav-text">错题本</span>
+        </div>
+        <div class="nav-item" data-view="dashboard">
+          <span class="nav-icon" data-icon="chart-column"></span>
+          <span class="nav-text">学习看板</span>
+        </div>
+        <div class="nav-item" data-view="diagnosis">
+          <span class="nav-icon" data-icon="stethoscope"></span>
+          <span class="nav-text">AI诊断</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="user-avatar">学</div>
+          <div class="user-detail">
+            <span class="user-name" id="user-name">用户</span>
+            <span class="user-role">学生</span>
+          </div>
+        </div>
+        <button class="btn-logout" id="btn-logout" title="退出登录">退出</button>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- AI答疑视图 -->
+      <div id="view-chat" class="view active">
+        <div class="chat-layout">
+          <!-- 对话列表 -->
+          <div class="chat-sidebar">
+            <button class="btn-new-chat" id="btn-new-chat">
+              <span class="btn-inline-icon" data-icon="plus"></span>新建对话
+            </button>
+            <div class="conversation-list" id="conversation-list">
+              <div class="empty-tip">暂无对话</div>
+            </div>
+          </div>
+
+          <!-- 对话区域 -->
+          <div class="chat-area">
+            <div class="chat-header">
+              <h2 id="chat-title">AI智能答疑</h2>
+              <p class="chat-subtitle">有什么学习问题，尽管问我吧</p>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+              <div class="welcome-message">
+                <div class="message-avatar ai" data-icon="graduation-cap"></div>
+                <div class="message-bubble ai">
+                  <p>你好！我是你的AI学习辅导老师「小智」。</p>
+                  <p>我可以帮你：</p>
+                  <ul>
+                    <li>解答各学科的学习问题</li>
+                    <li>讲解解题思路和方法</li>
+                    <li>分享学习技巧和复习建议</li>
+                  </ul>
+                  <p>有什么问题尽管问我吧！</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <textarea id="chat-input" placeholder="输入你的问题，按Enter发送，Shift+Enter换行..." rows="1"></textarea>
+                <button class="btn-send" id="btn-send">发送</button>
+              </div>
+              <p class="chat-disclaimer">AI生成内容仅供参考，请结合实际情况判断</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 知识点拆解视图 -->
+      <div id="view-knowledge" class="view">
+        <div class="page-header">
+          <h2><span class="view-title-icon" data-icon="book-open"></span>知识点拆解</h2>
+          <p>输入一个知识点，AI帮你结构化拆解，轻松掌握</p>
+        </div>
+
+        <div class="knowledge-generator">
+          <div class="input-group-large">
+            <input type="text" id="knowledge-topic" placeholder="输入要拆解的知识点，例如：牛顿第二定律、JavaScript闭包、英语定语从句...">
+            <button class="btn-primary" id="btn-generate-knowledge">开始拆解</button>
+          </div>
+        </div>
+
+        <div class="knowledge-result" id="knowledge-result" style="display:none;">
+          <div class="result-header">
+            <h3 id="knowledge-title"></h3>
+            <button class="btn-secondary" id="btn-save-knowledge">保存</button>
+          </div>
+          <div class="result-content markdown-body" id="knowledge-content"></div>
+        </div>
+
+        <div class="knowledge-history">
+          <h3>历史记录</h3>
+          <div class="history-list" id="knowledge-history-list">
+            <div class="empty-tip">暂无历史记录</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 学习计划视图 -->
+      <div id="view-plan" class="view">
+        <div class="page-header">
+          <h2><span class="view-title-icon" data-icon="calendar-days"></span>学习计划生成</h2>
+          <p>告诉AI你的科目和考试时间，自动生成专属学习计划</p>
+        </div>
+
+        <div class="plan-generator card">
+          <div class="form-row">
+            <div class="form-group">
+              <label>科目名称</label>
+              <input type="text" id="plan-subject" placeholder="例如：高等数学、大学英语、计算机组成原理">
+            </div>
+            <div class="form-group">
+              <label>考试日期</label>
+              <input type="date" id="plan-exam-date">
+            </div>
+            <div class="form-group">
+              <label>每日学习时长（小时）</label>
+              <input type="number" id="plan-hours" placeholder="例如：3" min="0.5" max="24" step="0.5">
+            </div>
+          </div>
+          <button class="btn-primary" id="btn-generate-plan">生成学习计划</button>
+        </div>
+
+        <div class="plan-result" id="plan-result" style="display:none;">
+          <div class="result-header">
+            <h3 id="plan-title"></h3>
+            <button class="btn-secondary" id="btn-save-plan">保存计划</button>
+          </div>
+          <div class="result-content markdown-body" id="plan-content"></div>
+        </div>
+
+        <div class="plan-history">
+          <h3>我的学习计划</h3>
+          <div class="history-list" id="plan-history-list">
+            <div class="empty-tip">暂无学习计划</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 错题本视图 -->
+      <div id="view-mistake" class="view">
+        <div class="page-header">
+          <h2><span class="view-title-icon" data-icon="notebook-pen"></span>错题本</h2>
+          <p>记录错题，AI自动分析错误原因并生成类似练习题</p>
+        </div>
+
+        <div class="mistake-actions">
+          <button class="btn-primary" id="btn-add-mistake"><span class="btn-inline-icon" data-icon="plus"></span>添加错题</button>
+          <div class="filter-group">
+            <select id="mistake-filter">
+              <option value="">全部科目</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 今日复习提醒（艾宾浩斯） -->
+        <div class="review-banner" id="review-banner">
+          <div class="review-banner-info">
+            <span class="review-banner-icon" id="review-banner-icon" data-icon="brain"></span>
+            <div class="review-banner-content">
+              <h3 id="review-banner-title">艾宾浩斯智能复习</h3>
+              <p id="review-banner-desc">正在加载今日复习任务...</p>
+            </div>
+          </div>
+          <button class="btn-primary" id="btn-start-review">开始复习</button>
+        </div>
+
+        <!-- 添加错题弹窗 -->
+        <div class="modal hidden" id="mistake-modal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>添加错题</h3>
+              <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label>科目 *</label>
+                <input type="text" id="mistake-subject" placeholder="例如：高等数学">
+              </div>
+              <div class="form-group">
+                <label>题目内容 *</label>
+                <textarea id="mistake-question" rows="3" placeholder="输入题目内容"></textarea>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>你的答案</label>
+                  <input type="text" id="mistake-your-answer" placeholder="你选了什么">
+                </div>
+                <div class="form-group">
+                  <label>正确答案</label>
+                  <input type="text" id="mistake-correct-answer" placeholder="正确答案是什么">
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-secondary" id="modal-cancel">取消</button>
+              <button class="btn-primary" id="modal-submit">提交并AI分析</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mistake-list" id="mistake-list">
+          <div class="empty-tip">暂无错题，点击上方按钮添加</div>
+        </div>
+
+        <!-- 错题详情弹窗 -->
+        <div class="modal hidden" id="mistake-detail-modal">
+          <div class="modal-content large">
+            <div class="modal-header">
+              <h3 id="detail-title">错题详情</h3>
+              <button class="modal-close" id="detail-close">&times;</button>
+            </div>
+            <div class="modal-body" id="detail-body">
+            </div>
+          </div>
+        </div>
+
+        <!-- 错题复习弹窗（艾宾浩斯） -->
+        <div class="modal hidden" id="review-modal">
+          <div class="modal-content large">
+            <div class="modal-header">
+              <h3><span class="modal-title-icon" data-icon="brain"></span>艾宾浩斯复习 <span id="review-progress" class="review-progress"></span></h3>
+              <button class="modal-close" id="review-close">&times;</button>
+            </div>
+            <div class="modal-body" id="review-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 学习看板视图 -->
+      <div id="view-dashboard" class="view">
+        <div class="page-header">
+          <h2><span class="view-title-icon" data-icon="chart-column"></span>学习数据看板</h2>
+          <p>记录你的学习轨迹，见证每一点进步</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" data-icon="message-square"></div>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-chats">0</div>
+              <div class="stat-label">AI答疑次数</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" data-icon="book-open"></div>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-knowledge">0</div>
+              <div class="stat-label">知识点拆解</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" data-icon="clipboard-x"></div>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-mistakes">0</div>
+              <div class="stat-label">错题总数</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" data-icon="target"></div>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-mastery">0%</div>
+              <div class="stat-label">错题掌握率</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" data-icon="calendar"></div>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-plans">0</div>
+              <div class="stat-label">学习计划</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" data-icon="flame"></div>
+            <div class="stat-info">
+              <div class="stat-value" id="stat-days">0</div>
+              <div class="stat-label">学习天数</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-charts">
+          <div class="chart-card">
+            <h3>最近7天学习趋势</h3>
+            <div class="chart-container" id="trend-chart">
+              <div class="empty-tip">暂无数据</div>
+            </div>
+          </div>
+          <div class="chart-card">
+            <h3>错题科目分布</h3>
+            <div class="chart-container" id="subject-chart">
+              <div class="empty-tip">暂无数据</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI学习诊断视图 -->
+      <div id="view-diagnosis" class="view">
+        <div class="page-header">
+          <h2><span class="view-title-icon" data-icon="stethoscope"></span>AI学习诊断</h2>
+          <p>综合你的答疑、知识点、错题与学习数据，AI生成专属学习诊断报告</p>
+        </div>
+
+        <div class="diagnosis-intro card">
+          <div class="diagnosis-intro-text">
+            <h3>一键生成你的"学习体检报告"</h3>
+            <p>AI会分析你的学习活跃度、优势科目、薄弱知识点和错题情况，给出针对性提分建议和下一步行动清单。报告自动保存，可打印或导出PDF。</p>
+            <p class="diagnosis-tip"><span class="inline-icon" data-icon="lightbulb"></span>建议在积累了一定的答疑、知识点或错题数据后生成，诊断会更准确。</p>
+          </div>
+          <button class="btn-primary" id="btn-generate-diagnosis"><span class="btn-inline-icon" data-icon="stethoscope"></span>生成我的诊断报告</button>
+        </div>
+
+        <div class="diagnosis-result" id="diagnosis-result" style="display:none;">
+          <div class="result-header">
+            <h3 id="diagnosis-title"></h3>
+            <button class="btn-secondary" id="btn-print-diagnosis"><span class="btn-inline-icon" data-icon="printer"></span>打印 / 导出PDF</button>
+          </div>
+          <div class="diagnosis-summary" id="diagnosis-summary"></div>
+          <div class="result-content markdown-body" id="diagnosis-content"></div>
+        </div>
+
+        <div class="diagnosis-history">
+          <h3>历史诊断报告</h3>
+          <div class="history-list" id="diagnosis-history-list">
+            <div class="empty-tip">暂无诊断报告</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast提示 -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 加载遮罩 -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+    <p id="loading-text">加载中...</p>
+  </div>
+
+  <script src="js/icons.js?v=20261020"></script>
+  <script src="js/api.js?v=20261020"></script>
+  <script src="js/ai.js?v=20261020"></script>
+  <script src="js/app.js?v=20261020"></script>
+</body>
+</html>
