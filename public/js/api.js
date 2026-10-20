@@ -287,4 +287,33 @@ const API = {
       });
     },
   },
+
+  // ==================== AI智能出题相关 ====================
+  quiz: {
+    // 生成练习题
+    async generate(subject, count = 5, basedOnMistakes = true) {
+      return API.request('/api/quiz/generate', {
+        method: 'POST',
+        body: JSON.stringify({ subject, count, based_on_mistakes: basedOnMistakes }),
+      });
+    },
+
+    // 保存作答结果
+    async save(subject, title, questions, userAnswers, score, total) {
+      return API.request('/api/quiz/save', {
+        method: 'POST',
+        body: JSON.stringify({ subject, title, questions, user_answers: userAnswers, score, total }),
+      });
+    },
+
+    // 获取出题记录列表
+    async getList() {
+      return API.request('/api/quiz/list');
+    },
+
+    // 获取出题记录详情
+    async getDetail(id) {
+      return API.request(`/api/quiz/${id}`);
+    },
+  },
 };

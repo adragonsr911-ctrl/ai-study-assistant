@@ -328,6 +328,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-start-review').addEventListener('click', () => AI.startReview());
   document.getElementById('review-close').addEventListener('click', () => AI.closeReview());
 
+  // ---------- AI智能出题相关 ----------
+  document.getElementById('btn-ai-quiz').addEventListener('click', () => AI.openQuizModal());
+  document.getElementById('quiz-close').addEventListener('click', () => AI.closeQuizModal());
+  document.getElementById('btn-quiz-generate').addEventListener('click', () => AI.generateQuiz());
+  document.getElementById('btn-quiz-submit').addEventListener('click', () => AI.submitQuiz());
+  document.getElementById('btn-quiz-save').addEventListener('click', () => AI.saveQuizRecord());
+  document.getElementById('btn-quiz-retry').addEventListener('click', () => AI.retryQuiz());
+
+  // ---------- 数据导出相关 ----------
+  document.getElementById('btn-export-mistakes').addEventListener('click', () => AI.exportMistakes());
+  document.getElementById('btn-export-plan').addEventListener('click', () => AI.exportPlan());
+
   // 科目筛选
   document.getElementById('mistake-filter').addEventListener('change', (e) => {
     AI.loadMistakes(e.target.value);

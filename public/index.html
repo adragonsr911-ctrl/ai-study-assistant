@@ -7,7 +7,7 @@
   <meta name="description" content="AI智能学习助手：AI答疑、知识点拆解、学习计划、错题本、艾宾浩斯智能复习、学习看板与AI诊断，构建学—练—测—复习完整学习闭环。">
   <meta name="theme-color" content="#2563eb">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232563eb'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' transform='scale(0.66) translate(6.2,6.2)'%3E%3Cpath d='M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z'/%3E%3Cpath d='M22 10v6'/%3E%3Cpath d='M6 12.5V16a6 3 0 0 0 12 0v-3.5'/%3E%3C/g%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=20261020">
+  <link rel="stylesheet" href="css/style.css?v=20261022">
   <!-- 代码高亮（本地化，离线可用） -->
   <link rel="stylesheet" href="vendor/css/github.min.css">
   <script src="vendor/js/highlight.min.js"></script>
@@ -459,7 +459,10 @@
         <div class="plan-result" id="plan-result" style="display:none;">
           <div class="result-header">
             <h3 id="plan-title"></h3>
-            <button class="btn-secondary" id="btn-save-plan">保存计划</button>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-ghost" id="btn-export-plan"><span class="btn-inline-icon" data-icon="download"></span>导出</button>
+              <button class="btn-secondary" id="btn-save-plan">保存计划</button>
+            </div>
           </div>
           <div class="result-content markdown-body" id="plan-content"></div>
         </div>
@@ -481,6 +484,8 @@
 
         <div class="mistake-actions">
           <button class="btn-primary" id="btn-add-mistake"><span class="btn-inline-icon" data-icon="plus"></span>添加错题</button>
+          <button class="btn-secondary" id="btn-ai-quiz"><span class="btn-inline-icon" data-icon="sparkles"></span>AI智能出题</button>
+          <button class="btn-ghost" id="btn-export-mistakes"><span class="btn-inline-icon" data-icon="download"></span>导出</button>
           <div class="filter-group">
             <select id="mistake-filter">
               <option value="">全部科目</option>
@@ -558,6 +563,93 @@
               <button class="modal-close" id="review-close">&times;</button>
             </div>
             <div class="modal-body" id="review-body"></div>
+          </div>
+        </div>
+
+        <!-- AI智能出题弹窗 -->
+        <div class="modal hidden" id="quiz-modal">
+          <div class="modal-content large">
+            <div class="modal-header">
+              <h3><span class="modal-title-icon" data-icon="sparkles"></span>AI智能出题</h3>
+              <button class="modal-close" id="quiz-close">&times;</button>
+            </div>
+            <div class="modal-body">
+              <!-- 第一步：配置 -->
+              <div id="quiz-step-config">
+                <p class="quiz-desc">基于你的错题情况，AI自动生成针对性练习题</p>
+                <div class="quiz-config-row">
+                  <div class="form-group">
+                    <label>选择科目</label>
+                    <select id="quiz-subject">
+                      <option value="数学">数学</option>
+                      <option value="英语">英语</option>
+                      <option value="物理">物理</option>
+                      <option value="化学">化学</option>
+                      <option value="计算机">计算机</option>
+                      <option value="语文">语文</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>题目数量</label>
+                    <select id="quiz-count">
+                      <option value="5">5道</option>
+                      <option value="8">8道</option>
+                      <option value="10">10道</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="quiz-config-check">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="quiz-based-mistakes" checked>
+                    <span>基于我的错题生成（针对性更强）</span>
+                  </label>
+                </div>
+                <button class="btn-primary btn-block" id="btn-quiz-generate">
+                  <span class="btn-inline-icon" data-icon="sparkles"></span>开始生成
+                </button>
+              </div>
+
+              <!-- 第二步：生成中 -->
+              <div id="quiz-step-loading" class="hidden">
+                <div class="quiz-loading">
+                  <div class="quiz-spinner"></div>
+                  <p>AI正在根据你的学情生成专属练习题...</p>
+                  <p class="quiz-loading-sub">预计需要10-20秒</p>
+                </div>
+              </div>
+
+              <!-- 第三步：作答 -->
+              <div id="quiz-step-quiz" class="hidden">
+                <div class="quiz-info-bar">
+                  <span id="quiz-info-subject"></span>
+                  <span id="quiz-info-count"></span>
+                  <span id="quiz-based-tag" class="quiz-based-tag hidden"><span data-icon="sparkles"></span>基于错题生成</span>
+                </div>
+                <div id="quiz-questions-list"></div>
+                <div class="quiz-actions">
+                  <button class="btn-primary" id="btn-quiz-submit">提交批改</button>
+                </div>
+              </div>
+
+              <!-- 第四步：结果 -->
+              <div id="quiz-step-result" class="hidden">
+                <div class="quiz-result-header">
+                  <div class="quiz-score-circle">
+                    <span id="quiz-score-num">0</span>
+                    <span class="quiz-score-total">/<span id="quiz-total-num">0</span></span>
+                  </div>
+                  <div class="quiz-result-info">
+                    <h3 id="quiz-result-title">练习完成！</h3>
+                    <p id="quiz-result-desc"></p>
+                  </div>
+                </div>
+                <div id="quiz-result-list"></div>
+                <div class="quiz-actions">
+                  <button class="btn-secondary" id="btn-quiz-retry">再来一组</button>
+                  <button class="btn-primary" id="btn-quiz-save">保存记录</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -674,9 +766,9 @@
     <p id="loading-text">加载中...</p>
   </div>
 
-  <script src="js/icons.js?v=20261020"></script>
-  <script src="js/api.js?v=20261020"></script>
-  <script src="js/ai.js?v=20261020"></script>
-  <script src="js/app.js?v=20261020"></script>
+  <script src="js/icons.js?v=20261022"></script>
+  <script src="js/api.js?v=20261022"></script>
+  <script src="js/ai.js?v=20261022"></script>
+  <script src="js/app.js?v=20261022"></script>
 </body>
 </html>

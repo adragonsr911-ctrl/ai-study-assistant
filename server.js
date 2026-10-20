@@ -13,6 +13,7 @@ const planRoutes = require('./routes/plan');
 const mistakeRoutes = require('./routes/mistake');
 const dashboardRoutes = require('./routes/dashboard');
 const diagnosisRoutes = require('./routes/diagnosis');
+const quizRoutes = require('./routes/quiz');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +34,7 @@ app.use('/api/plan', planRoutes);
 app.use('/api/mistake', mistakeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/diagnosis', diagnosisRoutes);
+app.use('/api/quiz', quizRoutes);
 
 // 根路径重定向到首页
 app.get('/', (req, res) => {

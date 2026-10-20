@@ -801,6 +801,220 @@ const AI = {
     this.loadMistakes(document.getElementById('mistake-filter').value);
   },
 
+  // ==================== AI智能出题功能 ====================
+
+  // 当前出题状态
+  currentQuiz: null,
+  currentQuizAnswers: {},
+
+  // 打开出题弹窗
+  openQuizModal() {
+    this.currentQuiz = null;
+    this.currentQuizAnswers = {};
+    // 重置到配置步骤
+    document.getElementById('quiz-step-config').classList.remove('hidden');
+    document.getElementById('quiz-step-loading').classList.add('hidden');
+    document.getElementById('quiz-step-quiz').classList.add('hidden');
+    document.getElementById('quiz-step-result').classList.add('hidden');
+    document.getElementById('quiz-modal').classList.remove('hidden');
+  },
+
+  // 关闭出题弹窗
+  closeQuizModal() {
+    document.getElementById('quiz-modal').classList.add('hidden');
+  },
+
+  // 生成练习题
+  async generateQuiz() {
+    const subject = document.getElementById('quiz-subject').value;
+    const count = parseInt(document.getElementById('quiz-count').value);
+    const basedOnMistakes = document.getElementById('quiz-based-mistakes').checked;
+
+    // 切换到加载步骤
+    document.getElementById('quiz-step-config').classList.add('hidden');
+    document.getElementById('quiz-step-loading').classList.remove('hidden');
+
+    try {
+      const result = await API.quiz.generate(subject, count, basedOnMistakes);
+      this.currentQuiz = result;
+      this.currentQuizAnswers = {};
+      this.renderQuizQuestions();
+
+      // 切换到作答步骤
+      document.getElementById('quiz-step-loading').classList.add('hidden');
+      document.getElementById('quiz-step-quiz').classList.remove('hidden');
+
+      // 更新信息栏
+      document.getElementById('quiz-info-subject').textContent = `科目：${result.subject}`;
+      document.getElementById('quiz-info-count').textContent = `共${result.questions.length}题`;
+      const basedTag = document.getElementById('quiz-based-tag');
+      if (result.based_on_mistakes) {
+        basedTag.classList.remove('hidden');
+      } else {
+        basedTag.classList.add('hidden');
+      }
+    } catch (error) {
+      alert('生成题目失败：' + error.message);
+      // 回到配置步骤
+      document.getElementById('quiz-step-loading').classList.add('hidden');
+      document.getElementById('quiz-step-config').classList.remove('hidden');
+    }
+  },
+
+  // 渲染题目列表
+  renderQuizQuestions() {
+    const container = document.getElementById('quiz-questions-list');
+    const questions = this.currentQuiz.questions;
+
+    container.innerHTML = questions.map((q, idx) => `
+      <div class="quiz-question-card" data-qid="${q.id}">
+        <div class="quiz-question-title">
+          <span class="quiz-q-num">${idx + 1}</span>
+          <span class="quiz-q-text">${this.escapeHtml(q.question)}</span>
+        </div>
+        <div class="quiz-options">
+          ${q.options.map((opt, oi) => `
+            <label class="quiz-option" data-qid="${q.id}" data-oidx="${oi}">
+              <input type="radio" name="quiz-q-${q.id}" value="${oi}" class="quiz-option-input">
+              <span class="quiz-option-letter">${String.fromCharCode(65 + oi)}</span>
+              <span class="quiz-option-text">${this.escapeHtml(opt)}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+
+    // 绑定选项点击事件（事件委托）
+    container.querySelectorAll('.quiz-option').forEach(label => {
+      label.addEventListener('click', (e) => {
+        const qid = parseInt(label.dataset.qid);
+        const oidx = parseInt(label.dataset.oidx);
+        this.currentQuizAnswers[qid] = oidx;
+        // 更新选中样式
+        container.querySelectorAll(`.quiz-option[data-qid="${qid}"]`).forEach(l => {
+          l.classList.remove('selected');
+        });
+        label.classList.add('selected');
+      });
+    });
+  },
+
+  // 提交批改
+  submitQuiz() {
+    const questions = this.currentQuiz.questions;
+    const unanswered = questions.filter(q => this.currentQuizAnswers[q.id] === undefined);
+
+    if (unanswered.length > 0) {
+      if (!confirm(`还有${unanswered.length}道题未作答，确定提交吗？`)) {
+        return;
+      }
+    }
+
+    // 计算得分
+    let score = 0;
+    questions.forEach(q => {
+      if (this.currentQuizAnswers[q.id] === q.answer) {
+        score++;
+      }
+    });
+
+    this.showQuizResult(score, questions.length);
+  },
+
+  // 显示批改结果
+  showQuizResult(score, total) {
+    document.getElementById('quiz-step-quiz').classList.add('hidden');
+    document.getElementById('quiz-step-result').classList.remove('hidden');
+
+    document.getElementById('quiz-score-num').textContent = score;
+    document.getElementById('quiz-total-num').textContent = total;
+
+    // 评价语
+    const percent = score / total;
+    let title, desc;
+    if (percent >= 0.9) {
+      title = '优秀！';
+      desc = '掌握得非常扎实，继续保持！';
+    } else if (percent >= 0.7) {
+      title = '良好！';
+      desc = '大部分知识点已掌握，注意查漏补缺。';
+    } else if (percent >= 0.5) {
+      title = '及格';
+      desc = '还有提升空间，建议复习错题本中的相关内容。';
+    } else {
+      title = '需要加油';
+      desc = '基础还需加强，建议回到知识点拆解重新学习。';
+    }
+    document.getElementById('quiz-result-title').textContent = title;
+    document.getElementById('quiz-result-desc').textContent = desc;
+
+    // 渲染每题结果
+    const container = document.getElementById('quiz-result-list');
+    const questions = this.currentQuiz.questions;
+    container.innerHTML = questions.map((q, idx) => {
+      const userAnswer = this.currentQuizAnswers[q.id];
+      const isCorrect = userAnswer === q.answer;
+      const userAnswerText = userAnswer !== undefined ? q.options[userAnswer] : '未作答';
+      return `
+        <div class="quiz-result-card ${isCorrect ? 'correct' : 'wrong'}">
+          <div class="quiz-result-header">
+            <span class="quiz-q-num">${idx + 1}</span>
+            <span class="quiz-result-status">${isCorrect ? '✓ 正确' : '✗ 错误'}</span>
+          </div>
+          <div class="quiz-result-question">${this.escapeHtml(q.question)}</div>
+          <div class="quiz-result-answers">
+            <div class="quiz-result-row">
+              <span class="quiz-result-label">你的答案：</span>
+              <span class="${isCorrect ? 'correct-text' : 'wrong-text'}">${userAnswer !== undefined ? String.fromCharCode(65 + userAnswer) + '. ' : ''}${this.escapeHtml(userAnswerText)}</span>
+            </div>
+            <div class="quiz-result-row">
+              <span class="quiz-result-label">正确答案：</span>
+              <span class="correct-text">${String.fromCharCode(65 + q.answer)}. ${this.escapeHtml(q.options[q.answer])}</span>
+            </div>
+          </div>
+          <div class="quiz-result-analysis">
+            <span class="quiz-result-label">解析：</span>
+            <span>${this.escapeHtml(q.analysis)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  // 保存出题记录
+  async saveQuizRecord() {
+    if (!this.currentQuiz) return;
+
+    const questions = this.currentQuiz.questions;
+    let score = 0;
+    questions.forEach(q => {
+      if (this.currentQuizAnswers[q.id] === q.answer) score++;
+    });
+
+    try {
+      await API.quiz.save(
+        this.currentQuiz.subject,
+        `${this.currentQuiz.subject}专项练习`,
+        questions,
+        this.currentQuizAnswers,
+        score,
+        questions.length
+      );
+      alert('练习记录已保存！');
+      this.closeQuizModal();
+    } catch (error) {
+      alert('保存失败：' + error.message);
+    }
+  },
+
+  // 再来一组（回到配置步骤）
+  retryQuiz() {
+    this.currentQuiz = null;
+    this.currentQuizAnswers = {};
+    document.getElementById('quiz-step-result').classList.add('hidden');
+    document.getElementById('quiz-step-config').classList.remove('hidden');
+  },
+
   // ==================== 数据看板功能 ====================
 
   // 加载看板数据
@@ -1041,6 +1255,112 @@ const AI = {
         <script>window.onload=function(){setTimeout(function(){window.print();},300);}</script>
       </body></html>`);
     win.document.close();
+  },
+
+  // ==================== 数据导出功能 ====================
+
+  // 通用：下载文本文件
+  downloadTextFile(filename, content) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  // 导出错题本
+  async exportMistakes() {
+    try {
+      const result = await API.mistake.getList();
+      const mistakes = result.list || result.mistakes || result;
+      if (!Array.isArray(mistakes) || mistakes.length === 0) {
+        alert('错题本为空，无需导出');
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+      let content = `========== AI智能学习助手 - 错题本导出 ==========\n`;
+      content += `导出时间：${dateStr}\n`;
+      content += `总错题数：${mistakes.length}道\n`;
+      content += `================================================\n\n`;
+
+      const levelMap = ['未掌握', '部分掌握', '已掌握'];
+
+      mistakes.forEach((m, i) => {
+        content += `---------- 第${i + 1}题 ----------\n`;
+        content += `科目：${m.subject || '未分类'}\n`;
+        content += `题目：${m.question || '无'}\n`;
+        content += `你的答案：${m.your_answer || '未填写'}\n`;
+        content += `正确答案：${m.correct_answer || '未填写'}\n`;
+        content += `掌握程度：${levelMap[m.mastery_level] || '未掌握'}\n`;
+        if (m.analysis) {
+          content += `错误分析：${m.analysis}\n`;
+        }
+        if (m.similar_questions) {
+          content += `类似练习：${m.similar_questions}\n`;
+        }
+        content += `添加时间：${m.created_at || '未知'}\n\n`;
+      });
+
+      this.downloadTextFile(`错题本_${dateStr}.txt`, content);
+    } catch (error) {
+      alert('导出失败：' + error.message);
+    }
+  },
+
+  // 导出学习计划（导出当前显示的计划）
+  exportPlan() {
+    const titleEl = document.getElementById('plan-title');
+    const contentEl = document.getElementById('plan-content');
+    const title = titleEl ? titleEl.textContent : '未命名计划';
+    const content = contentEl ? contentEl.innerText : '';
+
+    if (!content || content.trim() === '') {
+      alert('没有可导出的学习计划');
+      return;
+    }
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+    let output = `========== AI智能学习助手 - 学习计划导出 ==========\n`;
+    output += `导出时间：${dateStr}\n`;
+    output += `计划名称：${title}\n`;
+    output += `==================================================\n\n`;
+    output += `${content}\n`;
+
+    this.downloadTextFile(`学习计划_${dateStr}.txt`, output);
+  },
+
+  // 导出诊断报告
+  async exportDiagnosis(reportId) {
+    try {
+      const report = await API.diagnosis.getDetail(reportId);
+      if (!report) {
+        alert('报告不存在');
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+      let content = `========== AI智能学习助手 - 学习诊断报告 ==========\n`;
+      content += `导出时间：${dateStr}\n`;
+      content += `报告标题：${report.title || '未命名'}\n`;
+      content += `生成时间：${report.created_at || '未知'}\n`;
+      content += `==================================================\n\n`;
+      content += `${report.content || '无内容'}\n`;
+
+      this.downloadTextFile(`诊断报告_${dateStr}.txt`, content);
+    } catch (error) {
+      alert('导出失败：' + error.message);
+    }
   },
 
   // ==================== 工具函数 ====================

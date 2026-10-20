@@ -139,6 +139,23 @@ db.exec(`
 `);
 console.log('✓ AI诊断报告表创建完成');
 
+// AI出题记录表
+db.exec(`
+  CREATE TABLE IF NOT EXISTS quiz_sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    subject TEXT NOT NULL,
+    title TEXT,
+    questions_json TEXT NOT NULL,
+    user_answers_json TEXT,
+    score INTEGER DEFAULT 0,
+    total INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+console.log('✓ AI出题记录表创建完成');
+
 // 创建索引
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
