@@ -94,6 +94,50 @@
   --sidebar-w: 244px;
 }
 
+/* ==================== 深色模式 ==================== */
+[data-theme="dark"] {
+  /* 品牌蓝：深色模式下稍微亮一点 */
+  --primary-color: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-active: #2563eb;
+  --primary-light: rgba(59, 130, 246, 0.15);
+  --primary-light-2: rgba(59, 130, 246, 0.25);
+  --primary-ring: rgba(59, 130, 246, 0.25);
+  --secondary-color: #94a3b8;
+
+  /* 中性色：深色模式 */
+  --bg-color: #0f172a;
+  --bg-soft: #1e293b;
+  --card-bg: #1e293b;
+  --surface: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-light: #64748b;
+  --border-color: #334155;
+  --border-strong: #475569;
+
+  /* 语义色：深色模式下稍微柔和 */
+  --success-color: #4ade80;
+  --success-light: rgba(74, 222, 128, 0.12);
+  --warning-color: #fbbf24;
+  --warning-light: rgba(251, 191, 36, 0.12);
+  --danger-color: #f87171;
+  --danger-light: rgba(248, 113, 113, 0.12);
+  --info-color: #38bdf8;
+
+  /* 阴影：深色模式下更暗 */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 20px -6px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20px 44px -14px rgba(0, 0, 0, 0.6), 0 8px 20px -10px rgba(0, 0, 0, 0.4);
+  --shadow-brand: 0 10px 24px -8px rgba(59, 130, 246, 0.35);
+}
+
+/* 深色模式下的平滑过渡 */
+body, .card, .stat-card, .chart-card, .sidebar, .modal-content, .nav-item, input, textarea, select, button {
+  transition: background-color var(--t), color var(--t), border-color var(--t), box-shadow var(--t);
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC', sans-serif;
@@ -227,7 +271,7 @@ textarea:focus-visible {
 }
 
 .btn-secondary {
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
   padding: 9px 20px;
@@ -289,7 +333,7 @@ textarea:focus-visible {
 
 .auth-container {
   position: relative;
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 40px;
@@ -367,7 +411,7 @@ textarea:focus-visible {
 }
 
 .tab-btn.active {
-  background: white;
+  background: var(--card-bg);
   color: var(--primary-color);
   box-shadow: var(--shadow-sm);
 }
@@ -447,7 +491,7 @@ textarea:focus-visible {
 /* 侧边栏 */
 .sidebar {
   width: 240px;
-  background: white;
+  background: var(--card-bg);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -610,6 +654,46 @@ textarea:focus-visible {
   color: var(--danger-color);
 }
 
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-theme-toggle {
+  background: none;
+  border: 1px solid var(--border-color);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--t-fast);
+  padding: 0;
+}
+
+.btn-theme-toggle:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: var(--primary-light);
+}
+
+.btn-theme-toggle .theme-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-theme-toggle .theme-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* 主内容区 */
 .main-content {
   flex: 1;
@@ -651,7 +735,7 @@ textarea:focus-visible {
 }
 
 .card {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   padding: 24px;
   box-shadow: var(--shadow-sm);
@@ -664,7 +748,7 @@ textarea:focus-visible {
   min-width: 0;
   height: calc(100vh - 48px - 24px * 2);
   gap: 0;
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
@@ -916,7 +1000,7 @@ textarea:focus-visible {
 
 .chat-input-wrapper:focus-within {
   border-color: var(--primary-color);
-  background: white;
+  background: var(--card-bg);
   box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
@@ -968,7 +1052,7 @@ textarea:focus-visible {
 .input-group-large {
   display: flex;
   gap: 12px;
-  background: white;
+  background: var(--card-bg);
   padding: 16px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
@@ -992,7 +1076,7 @@ textarea:focus-visible {
 .knowledge-result,
 .plan-result,
 .diagnosis-result {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 24px;
@@ -1081,7 +1165,7 @@ textarea:focus-visible {
 }
 
 .history-item {
-  background: white;
+  background: var(--card-bg);
   padding: 16px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
@@ -1142,7 +1226,7 @@ textarea:focus-visible {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   font-size: 14px;
-  background: white;
+  background: var(--card-bg);
   cursor: pointer;
 }
 
@@ -1154,7 +1238,7 @@ textarea:focus-visible {
 
 .mistake-card {
   position: relative;
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   padding: 20px;
   box-shadow: var(--shadow-sm);
@@ -1277,7 +1361,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-secondary);
   flex-shrink: 0;
 }
@@ -1532,7 +1616,7 @@ textarea:focus-visible {
 }
 
 .modal-content {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 560px;
@@ -1598,7 +1682,7 @@ textarea:focus-visible {
 }
 
 .stat-card {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   padding: 20px;
   display: flex;
@@ -1654,7 +1738,7 @@ textarea:focus-visible {
 }
 
 .chart-card {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   padding: 24px;
   box-shadow: var(--shadow-sm);
@@ -1707,7 +1791,7 @@ textarea:focus-visible {
 }
 
 .chart-tab.active {
-  background: white;
+  background: var(--card-bg);
   color: var(--primary-color);
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -2179,7 +2263,7 @@ textarea:focus-visible {
 }
 .btn-text:hover { opacity: 0.75; }
 .btn-light {
-  background: #fff;
+  background: var(--card-bg);
   color: var(--primary-color);
   border-color: #fff;
 }
@@ -2193,7 +2277,7 @@ textarea:focus-visible {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #fff;
+  background: var(--card-bg);
   border-bottom: 1px solid var(--border-color);
 }
 .landing-nav-inner {
@@ -2276,7 +2360,7 @@ textarea:focus-visible {
 
 /* 界面预览 mockup */
 .mockup-window {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-color);
@@ -2365,7 +2449,7 @@ textarea:focus-visible {
 /* 通用 section */
 .landing-section {
   padding: 80px 0;
-  background: #fff;
+  background: var(--card-bg);
 }
 .landing-section-alt {
   background: var(--surface);
@@ -2671,7 +2755,7 @@ textarea:focus-visible {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--card-bg);
   color: var(--primary-color);
   display: flex;
   align-items: center;
@@ -2728,7 +2812,7 @@ textarea:focus-visible {
   border-radius: var(--radius-sm);
   font-size: 14px;
   font-family: inherit;
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-primary);
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
   cursor: pointer;

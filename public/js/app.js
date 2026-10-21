@@ -1,3 +1,39 @@
+// ==================== 主题切换（深色/浅色模式） ====================
+
+function initTheme() {
+  // 优先读取用户保存的设置，其次跟随系统偏好
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+  // 更新切换按钮图标
+  const btn = document.getElementById('btn-theme-toggle');
+  if (btn) {
+    const iconEl = btn.querySelector('.theme-icon');
+    if (iconEl) {
+      iconEl.setAttribute('data-icon', theme === 'dark' ? 'sun' : 'moon');
+      if (window.ICONS) {
+        iconEl.innerHTML = ICONS[theme === 'dark' ? 'sun' : 'moon'] || '';
+      }
+    }
+    btn.title = theme === 'dark' ? '切换到浅色模式' : '切换到深色模式';
+  }
+  // 通知图表重绘（如果在看板页面）
+  if (window.Visualization && typeof window.onThemeChange === 'function') {
+    window.onThemeChange(theme);
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
 // ==================== 主应用逻辑 ====================
 
 // 将所有 [data-icon] 占位替换为统一的 Lucide SVG 图标
@@ -108,6 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 先渲染静态图标
   renderIcons();
 
+  // 初始化主题（深色/浅色）
+  initTheme();
+
   // 落地页区块滚动入场动效
   if ('IntersectionObserver' in window) {
     const landingObserver = new IntersectionObserver((entries) => {
@@ -196,6 +235,9 @@ document.addEventListener('DOMContentLoaded', () => {
       hideLoading();
     }
   });
+
+  // 主题切换
+  document.getElementById('btn-theme-toggle').addEventListener('click', toggleTheme);
 
   // 退出登录
   document.getElementById('btn-logout').addEventListener('click', () => {

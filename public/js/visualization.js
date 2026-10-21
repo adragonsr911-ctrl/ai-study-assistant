@@ -2,20 +2,40 @@
 // 包含：热力图、雷达图、趋势折线图、环形饼图
 
 window.Visualization = (function () {
-  const PRIMARY = '#2563eb';
-  const PRIMARY_LIGHT = '#93c5fd';
-  const PRIMARY_DARK = '#1d4ed8';
-  const GRAY_100 = '#f1f5f9';
-  const GRAY_200 = '#e2e8f0';
-  const GRAY_300 = '#cbd5e1';
-  const GRAY_500 = '#64748b';
-  const GRAY_700 = '#334155';
+  // 浅色模式颜色
+  const LIGHT_COLORS = {
+    primary: '#2563eb',
+    primaryLight: '#93c5fd',
+    primaryDark: '#1d4ed8',
+    grid: '#f1f5f9',
+    gridLine: '#e2e8f0',
+    axis: '#64748b',
+    text: '#334155',
+    heatmap: ['#ebedf0', '#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'],
+    pie: ['#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed'],
+  };
 
-  // 热力图5个等级的颜色（从浅到深）
-  const HEATMAP_COLORS = ['#ebedf0', '#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'];
+  // 深色模式颜色
+  const DARK_COLORS = {
+    primary: '#3b82f6',
+    primaryLight: '#60a5fa',
+    primaryDark: '#2563eb',
+    grid: '#1e293b',
+    gridLine: '#334155',
+    axis: '#94a3b8',
+    text: '#cbd5e1',
+    heatmap: ['#1e293b', '#1e3a5f', '#2563eb', '#3b82f6', '#60a5fa'],
+    pie: ['#3b82f6', '#22d3ee', '#4ade80', '#fbbf24', '#f87171', '#a78bfa'],
+  };
 
-  // 饼图配色（协调的多色）
-  const PIE_COLORS = ['#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed'];
+  // 获取当前主题颜色
+  function getColors() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    return theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+  }
+
+  // 缓存当前渲染的数据，用于主题切换时重绘
+  const renderCache = {};
 
   /**
    * 渲染学习热力图（类似GitHub贡献图）
@@ -27,6 +47,10 @@ window.Visualization = (function () {
       container.innerHTML = '<div class="empty-tip"><p>暂无学习数据</p></div>';
       return;
     }
+    // 缓存数据用于主题切换重绘
+    renderCache.heatmap = { container, data };
+
+    const colors = getColors();
 
     // 按周分组（7天一行，从周日开始）
     const weeks = [];
@@ -76,12 +100,12 @@ window.Visualization = (function () {
 
     // 月份标签
     monthLabels.forEach(m => {
-      svg += `<text x="${labelWidth + m.week * weekWidth}" y="12" font-size="10" fill="${GRAY_500}">${m.label}</text>`;
+      svg += `<text x="${labelWidth + m.week * weekWidth}" y="12" font-size="10" fill="${colors.axis}">${m.label}</text>`;
     });
 
     // 星期标签
     dayLabelPositions.forEach((pos, i) => {
-      svg += `<text x="2" y="${monthLabelHeight + pos * weekWidth + cellSize - 2}" font-size="9" fill="${GRAY_500}">${dayLabels[i]}</text>`;
+      svg += `<text x="2" y="${monthLabelHeight + pos * weekWidth + cellSize - 2}" font-size="9" fill="${colors.axis}">${dayLabels[i]}</text>`;
     });
 
     // 热力格子
@@ -90,7 +114,7 @@ window.Visualization = (function () {
         if (day === null) return;
         const x = labelWidth + wi * weekWidth;
         const y = monthLabelHeight + di * weekWidth;
-        const color = HEATMAP_COLORS[day.level] || HEATMAP_COLORS[0];
+        const color = colors.heatmap[day.level] || colors.heatmap[0];
         const title = `${day.date}：学习${day.study_minutes}分钟，活跃度${day.activity}`;
         svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${color}" data-date="${day.date}"><title>${title}</title></rect>`;
       });
@@ -99,9 +123,9 @@ window.Visualization = (function () {
     svg += '</svg>';
 
     // 图例
-    svg += `<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:10px;font-size:11px;color:${GRAY_500};">
+    svg += `<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:10px;font-size:11px;color:${colors.axis};">
       <span>少</span>
-      ${HEATMAP_COLORS.map(c => `<span style="display:inline-block;width:11px;height:11px;border-radius:2px;background:${c};"></span>`).join('')}
+      ${colors.heatmap.map(c => `<span style="display:inline-block;width:11px;height:11px;border-radius:2px;background:${c};"></span>`).join('')}
       <span>多</span>
     </div>`;
 
@@ -118,6 +142,8 @@ window.Visualization = (function () {
       container.innerHTML = '<div class="empty-tip"><p>暂无错题数据，添加错题后这里会展示各科掌握情况</p></div>';
       return;
     }
+    renderCache.radar = { container, data };
+    const colors = getColors();
 
     const size = 260;
     const center = size / 2;
@@ -136,7 +162,7 @@ window.Visualization = (function () {
         const angle = -Math.PI / 2 + i * angleStep;
         points.push(`${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`);
       }
-      svg += `<polygon points="${points.join(' ')}" fill="none" stroke="${GRAY_200}" stroke-width="1"/>`;
+      svg += `<polygon points="${points.join(' ')}" fill="none" stroke="${colors.gridLine}" stroke-width="1"/>`;
     }
 
     // 轴线
@@ -144,7 +170,7 @@ window.Visualization = (function () {
       const angle = -Math.PI / 2 + i * angleStep;
       const x2 = center + maxRadius * Math.cos(angle);
       const y2 = center + maxRadius * Math.sin(angle);
-      svg += `<line x1="${center}" y1="${center}" x2="${x2}" y2="${y2}" stroke="${GRAY_200}" stroke-width="1"/>`;
+      svg += `<line x1="${center}" y1="${center}" x2="${x2}" y2="${y2}" stroke="${colors.gridLine}" stroke-width="1"/>`;
     }
 
     // 数据多边形
@@ -154,7 +180,7 @@ window.Visualization = (function () {
       const r = (item.mastery_rate / 100) * maxRadius;
       dataPoints.push(`${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`);
     });
-    svg += `<polygon points="${dataPoints.join(' ')}" fill="${PRIMARY}" fill-opacity="0.2" stroke="${PRIMARY}" stroke-width="2"/>`;
+    svg += `<polygon points="${dataPoints.join(' ')}" fill="${colors.primary}" fill-opacity="0.2" stroke="${colors.primary}" stroke-width="2"/>`;
 
     // 数据点
     data.forEach((item, i) => {
@@ -162,7 +188,7 @@ window.Visualization = (function () {
       const r = (item.mastery_rate / 100) * maxRadius;
       const x = center + r * Math.cos(angle);
       const y = center + r * Math.sin(angle);
-      svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="${PRIMARY}" stroke="#fff" stroke-width="1.5"><title>${item.subject}：掌握率${item.mastery_rate}%（${item.mastered}/${item.total}题）</title></circle>`;
+      svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="${colors.primary}" stroke="${colors.grid}" stroke-width="1.5"><title>${item.subject}：掌握率${item.mastery_rate}%（${item.mastered}/${item.total}题）</title></circle>`;
     });
 
     // 轴标签
@@ -172,8 +198,8 @@ window.Visualization = (function () {
       const x = center + labelR * Math.cos(angle);
       const y = center + labelR * Math.sin(angle);
       const anchor = Math.abs(Math.cos(angle)) < 0.3 ? 'middle' : (Math.cos(angle) > 0 ? 'start' : 'end');
-      svg += `<text x="${x}" y="${y + 3}" text-anchor="${anchor}" font-size="11" fill="${GRAY_700}" font-weight="500">${item.subject}</text>`;
-      svg += `<text x="${x}" y="${y + 16}" text-anchor="${anchor}" font-size="10" fill="${PRIMARY}" font-weight="600">${item.mastery_rate}%</text>`;
+      svg += `<text x="${x}" y="${y + 3}" text-anchor="${anchor}" font-size="11" fill="${colors.text}" font-weight="500">${item.subject}</text>`;
+      svg += `<text x="${x}" y="${y + 16}" text-anchor="${anchor}" font-size="10" fill="${colors.primary}" font-weight="600">${item.mastery_rate}%</text>`;
     });
 
     svg += '</svg>';
@@ -191,6 +217,8 @@ window.Visualization = (function () {
       container.innerHTML = '<div class="empty-tip"><p>暂无学习数据</p></div>';
       return;
     }
+    renderCache.trend = { container, data, options };
+    const colors = getColors();
 
     const width = 480;
     const height = 200;
@@ -218,8 +246,8 @@ window.Visualization = (function () {
     for (let i = 0; i <= yTicks; i++) {
       const val = (niceMax / yTicks) * i;
       const y = padding.top + chartH - (val / niceMax) * chartH;
-      yGrid += `<line x1="${padding.left}" y1="${y}" x2="${padding.left + chartW}" y2="${y}" stroke="${GRAY_100}" stroke-width="1"/>`;
-      yGrid += `<text x="${padding.left - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="${GRAY_500}">${Math.round(val)}</text>`;
+      yGrid += `<line x1="${padding.left}" y1="${y}" x2="${padding.left + chartW}" y2="${y}" stroke="${colors.grid}" stroke-width="1"/>`;
+      yGrid += `<text x="${padding.left - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="${colors.axis}">${Math.round(val)}</text>`;
     }
 
     // X轴标签（根据数据量决定显示密度）
@@ -227,29 +255,29 @@ window.Visualization = (function () {
     let xLabels = '';
     points.forEach((p, i) => {
       if (i % labelStep === 0 || i === points.length - 1) {
-        xLabels += `<text x="${p.x}" y="${height - 8}" text-anchor="middle" font-size="10" fill="${GRAY_500}">${p.label}</text>`;
+        xLabels += `<text x="${p.x}" y="${height - 8}" text-anchor="middle" font-size="10" fill="${colors.axis}">${p.label}</text>`;
       }
     });
 
     // 数据点和悬浮提示
     let dots = '';
     points.forEach(p => {
-      dots += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#fff" stroke="${PRIMARY}" stroke-width="2"><title>${p.date}：学习${p.study_minutes}分钟</title></circle>`;
+      dots += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${colors.grid}" stroke="${colors.primary}" stroke-width="2"><title>${p.date}：学习${p.study_minutes}分钟</title></circle>`;
     });
 
     const svg = `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
       ${yGrid}
       <defs>
         <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${PRIMARY}" stop-opacity="0.25"/>
-          <stop offset="100%" stop-color="${PRIMARY}" stop-opacity="0.02"/>
+          <stop offset="0%" stop-color="${colors.primary}" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="${colors.primary}" stop-opacity="0.02"/>
         </linearGradient>
       </defs>
       <path d="${areaPath}" fill="url(#trendGradient)"/>
-      <path d="${linePath}" fill="none" stroke="${PRIMARY}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${linePath}" fill="none" stroke="${colors.primary}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${dots}
       ${xLabels}
-      <text x="${padding.left - 30}" y="${padding.top - 6}" font-size="10" fill="${GRAY_500}">分钟</text>
+      <text x="${padding.left - 30}" y="${padding.top - 6}" font-size="10" fill="${colors.axis}">分钟</text>
     </svg>`;
 
     container.innerHTML = svg;
@@ -265,6 +293,8 @@ window.Visualization = (function () {
       container.innerHTML = '<div class="empty-tip"><p>暂无错题数据</p></div>';
       return;
     }
+    renderCache.pie = { container, data };
+    const colors = getColors();
 
     const total = data.reduce((sum, item) => sum + item.count, 0);
     const size = 200;
@@ -282,7 +312,7 @@ window.Visualization = (function () {
       currentAngle = endAngle;
 
       const largeArc = percentage > 0.5 ? 1 : 0;
-      const color = PIE_COLORS[index % PIE_COLORS.length];
+      const color = colors.pie[index % colors.pie.length];
 
       const x1 = center + outerR * Math.cos(startAngle);
       const y1 = center + outerR * Math.sin(startAngle);
@@ -295,23 +325,23 @@ window.Visualization = (function () {
 
       const path = `M${x1},${y1} A${outerR},${outerR} 0 ${largeArc} 1 ${x2},${y2} L${x3},${y3} A${innerR},${innerR} 0 ${largeArc} 0 ${x4},${y4} Z`;
 
-      arcs += `<path d="${path}" fill="${color}" stroke="#fff" stroke-width="2"><title>${item.subject}：${item.count}题（${Math.round(percentage * 100)}%）</title></path>`;
+      arcs += `<path d="${path}" fill="${color}" stroke="${colors.grid}" stroke-width="2"><title>${item.subject}：${item.count}题（${Math.round(percentage * 100)}%）</title></path>`;
     });
 
     const svg = `<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center;">
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
         ${arcs}
-        <text x="${center}" y="${center - 4}" text-anchor="middle" font-size="24" font-weight="700" fill="${GRAY_700}">${total}</text>
-        <text x="${center}" y="${center + 16}" text-anchor="middle" font-size="11" fill="${GRAY_500}">道错题</text>
+        <text x="${center}" y="${center - 4}" text-anchor="middle" font-size="24" font-weight="700" fill="${colors.text}">${total}</text>
+        <text x="${center}" y="${center + 16}" text-anchor="middle" font-size="11" fill="${colors.axis}">道错题</text>
       </svg>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${data.map((item, index) => {
-          const color = PIE_COLORS[index % PIE_COLORS.length];
+          const color = colors.pie[index % colors.pie.length];
           const pct = Math.round((item.count / total) * 100);
           return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
             <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${color};"></span>
-            <span style="color:${GRAY_700};min-width:60px;">${item.subject}</span>
-            <span style="color:${GRAY_500};">${item.count}题 · ${pct}%</span>
+            <span style="color:${colors.text};min-width:60px;">${item.subject}</span>
+            <span style="color:${colors.axis};">${item.count}题 · ${pct}%</span>
           </div>`;
         }).join('')}
       </div>
@@ -320,10 +350,24 @@ window.Visualization = (function () {
     container.innerHTML = svg;
   }
 
+  // 主题切换时重绘所有图表
+  function redrawAll() {
+    if (renderCache.heatmap) renderHeatmap(renderCache.heatmap.container, renderCache.heatmap.data);
+    if (renderCache.radar) renderRadar(renderCache.radar.container, renderCache.radar.data);
+    if (renderCache.trend) renderTrendLine(renderCache.trend.container, renderCache.trend.data, renderCache.trend.options);
+    if (renderCache.pie) renderPie(renderCache.pie.container, renderCache.pie.data);
+  }
+
+  // 暴露给app.js的主题切换回调
+  window.onThemeChange = function () {
+    redrawAll();
+  };
+
   return {
     renderHeatmap,
     renderRadar,
     renderTrendLine,
     renderPie,
+    redrawAll,
   };
 })();
