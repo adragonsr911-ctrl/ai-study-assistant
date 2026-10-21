@@ -1,7 +1,9 @@
 // RAG检索增强生成：根据用户问题检索个人学习数据，注入AI上下文
+// 支持两种检索模式：语义检索（Embedding余弦相似度）和关键词匹配（降级方案）
 const db = require('../db');
+const { getEmbedding, cosineSimilarity } = require('./embedding');
 
-// 学科关键词（用于匹配错题、知识点、学习计划）
+// 学科关键词（用于关键词匹配降级）
 const SUBJECT_KEYWORDS = [
   '数学', '英语', '语文', '物理', '化学', '生物',
   '历史', '地理', '政治', '计算机', '编程', '代码',
@@ -22,21 +24,202 @@ function extractKeywords(query) {
 }
 
 /**
- * 检索用户个人学习数据
- * @param {number} userId - 用户ID
- * @param {string} query - 用户问题
- * @returns {object} 包含mistakes/knowledge/plans/diagnosis的检索结果
+ * 从源表加载所有学习数据（用于懒加载向量化）
  */
-function retrieveContext(userId, query) {
+function loadAllSourceData(userId) {
+  const allData = [];
+
+  // 错题本
+  try {
+    const mistakes = db.prepare(`
+      SELECT id, subject, question, analysis, correct_answer FROM mistakes WHERE user_id = ?
+    `).all(userId);
+    mistakes.forEach(m => {
+      allData.push({
+        source_type: 'mistake',
+        source_id: m.id,
+        content_text: `[${m.subject}] ${m.question} ${m.analysis || ''} ${m.correct_answer || ''}`.substring(0, 500)
+      });
+    });
+  } catch (e) { console.error('加载错题失败:', e.message); }
+
+  // 知识点
+  try {
+    const knowledge = db.prepare(`
+      SELECT id, topic, content FROM knowledge_points WHERE user_id = ?
+    `).all(userId);
+    knowledge.forEach(k => {
+      allData.push({
+        source_type: 'knowledge',
+        source_id: k.id,
+        content_text: `[知识点] ${k.topic} ${(k.content || '').substring(0, 400)}`
+      });
+    });
+  } catch (e) { console.error('加载知识点失败:', e.message); }
+
+  // 学习计划
+  try {
+    const plans = db.prepare(`
+      SELECT id, subject, content FROM study_plans WHERE user_id = ?
+    `).all(userId);
+    plans.forEach(p => {
+      allData.push({
+        source_type: 'plan',
+        source_id: p.id,
+        content_text: `[学习计划-${p.subject}] ${(p.content || '').substring(0, 400)}`
+      });
+    });
+  } catch (e) { console.error('加载学习计划失败:', e.message); }
+
+  // 诊断报告
+  try {
+    const diagnosis = db.prepare(`
+      SELECT id, title, content FROM diagnosis_reports WHERE user_id = ?
+    `).all(userId);
+    diagnosis.forEach(d => {
+      allData.push({
+        source_type: 'diagnosis',
+        source_id: d.id,
+        content_text: `[诊断报告] ${d.title} ${(d.content || '').substring(0, 400)}`
+      });
+    });
+  } catch (e) { console.error('加载诊断报告失败:', e.message); }
+
+  return allData;
+}
+
+/**
+ * 确保学习数据已向量化（懒加载）
+ * 对于没有向量的数据，实时生成并存储
+ */
+async function ensureEmbeddings(userId) {
+  // 统计已有向量数量
+  const countRow = db.prepare('SELECT COUNT(*) as cnt FROM knowledge_embeddings WHERE user_id = ?').get(userId);
+  const existingCount = countRow ? countRow.cnt : 0;
+
+  // 加载所有源数据
+  const allData = loadAllSourceData(userId);
+
+  // 找出还没有向量的数据
+  const missing = [];
+  for (const item of allData) {
+    const exists = db.prepare(
+      'SELECT id FROM knowledge_embeddings WHERE user_id = ? AND source_type = ? AND source_id = ?'
+    ).get(userId, item.source_type, item.source_id);
+    if (!exists) {
+      missing.push(item);
+    }
+  }
+
+  if (missing.length === 0) {
+    return;
+  }
+
+  console.log(`RAG语义检索：为${missing.length}条学习数据生成向量...`);
+
+  // 逐条生成向量（避免批量请求超时）
+  for (const item of missing) {
+    try {
+      const vector = await getEmbedding(item.content_text);
+      db.prepare(`
+        INSERT OR IGNORE INTO knowledge_embeddings (user_id, source_type, source_id, content_text, vector_json)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(userId, item.source_type, item.source_id, item.content_text, JSON.stringify(vector));
+    } catch (e) {
+      console.error(`生成向量失败 (${item.source_type}:${item.source_id}):`, e.message);
+    }
+  }
+
+  console.log('RAG语义检索：向量生成完成');
+}
+
+/**
+ * 语义检索：基于Embedding余弦相似度检索最相关的学习数据
+ */
+async function semanticRetrieval(userId, query) {
+  // 1. 确保数据已向量化
+  await ensureEmbeddings(userId);
+
+  // 2. 生成问题向量
+  const queryVector = await getEmbedding(query.substring(0, 500));
+
+  // 3. 加载用户所有向量
+  const embeddings = db.prepare(`
+    SELECT source_type, source_id, content_text, vector_json
+    FROM knowledge_embeddings
+    WHERE user_id = ? AND vector_json IS NOT NULL
+  `).all(userId);
+
+  if (embeddings.length === 0) {
+    return null; // 没有向量数据，降级
+  }
+
+  // 4. 计算余弦相似度，排序
+  const scored = embeddings.map(item => {
+    let vector = [];
+    try {
+      vector = JSON.parse(item.vector_json);
+    } catch (e) {
+      vector = [];
+    }
+    const score = cosineSimilarity(queryVector, vector);
+    return { ...item, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // 5. 取Top 8最相关的内容，按来源分类
+  const topItems = scored.slice(0, 8);
+  const context = {
+    mistakes: [],
+    knowledge: [],
+    plans: [],
+    diagnosis: [],
+    _semantic: true,
+  };
+
+  for (const item of topItems) {
+    if (item.score < 0.3) continue; // 相似度太低的跳过
+
+    if (item.source_type === 'mistake') {
+      const detail = db.prepare('SELECT subject, question, your_answer, correct_answer, analysis, mastery_level FROM mistakes WHERE id = ?').get(item.source_id);
+      if (detail) context.mistakes.push({ ...detail, _score: item.score });
+    } else if (item.source_type === 'knowledge') {
+      const detail = db.prepare('SELECT topic, content FROM knowledge_points WHERE id = ?').get(item.source_id);
+      if (detail) context.knowledge.push({ ...detail, _score: item.score });
+    } else if (item.source_type === 'plan') {
+      const detail = db.prepare('SELECT subject, exam_date, daily_hours, content FROM study_plans WHERE id = ?').get(item.source_id);
+      if (detail) context.plans.push({ ...detail, _score: item.score });
+    } else if (item.source_type === 'diagnosis') {
+      const detail = db.prepare('SELECT title, content FROM diagnosis_reports WHERE id = ?').get(item.source_id);
+      if (detail) context.diagnosis.push({ ...detail, _score: item.score });
+    }
+  }
+
+  // 每类最多取一定数量
+  context.mistakes = context.mistakes.slice(0, 5);
+  context.knowledge = context.knowledge.slice(0, 3);
+  context.plans = context.plans.slice(0, 2);
+  context.diagnosis = context.diagnosis.slice(0, 1);
+
+  const total = context.mistakes.length + context.knowledge.length + context.plans.length + context.diagnosis.length;
+  return total > 0 ? context : null;
+}
+
+/**
+ * 关键词匹配检索（降级方案）
+ */
+function keywordRetrieval(userId, query) {
   const keywords = extractKeywords(query);
   const context = {
     mistakes: [],
     knowledge: [],
     plans: [],
     diagnosis: [],
+    _semantic: false,
   };
 
-  // 1. 检索错题本（按学科关键词匹配subject或question）
+  // 1. 检索错题本
   try {
     let sql = 'SELECT subject, question, your_answer, correct_answer, analysis, mastery_level, created_at FROM mistakes WHERE user_id = ?';
     let params = [userId];
@@ -52,10 +235,10 @@ function retrieveContext(userId, query) {
     sql += ' ORDER BY created_at DESC LIMIT 5';
     context.mistakes = db.prepare(sql).all(...params);
   } catch (e) {
-    console.error('RAG检索错题本错误:', e.message);
+    console.error('RAG关键词检索错题本错误:', e.message);
   }
 
-  // 2. 检索知识点拆解（按关键词匹配topic）
+  // 2. 检索知识点
   try {
     let sql = 'SELECT topic, content, created_at FROM knowledge_points WHERE user_id = ?';
     let params = [userId];
@@ -70,10 +253,10 @@ function retrieveContext(userId, query) {
     sql += ' ORDER BY created_at DESC LIMIT 3';
     context.knowledge = db.prepare(sql).all(...params);
   } catch (e) {
-    console.error('RAG检索知识点错误:', e.message);
+    console.error('RAG关键词检索知识点错误:', e.message);
   }
 
-  // 3. 检索学习计划（按关键词匹配subject）
+  // 3. 检索学习计划
   try {
     let sql = 'SELECT subject, exam_date, daily_hours, content, created_at FROM study_plans WHERE user_id = ?';
     let params = [userId];
@@ -88,25 +271,47 @@ function retrieveContext(userId, query) {
     sql += ' ORDER BY created_at DESC LIMIT 2';
     context.plans = db.prepare(sql).all(...params);
   } catch (e) {
-    console.error('RAG检索学习计划错误:', e.message);
+    console.error('RAG关键词检索学习计划错误:', e.message);
   }
 
-  // 4. 检索最近的AI诊断报告（全局，不需要关键词，取最新1份）
+  // 4. 检索诊断报告（最新1份）
   try {
     context.diagnosis = db.prepare(
       'SELECT title, content, created_at FROM diagnosis_reports WHERE user_id = ? ORDER BY created_at DESC LIMIT 1'
     ).all(userId);
   } catch (e) {
-    console.error('RAG检索诊断报告错误:', e.message);
+    console.error('RAG关键词检索诊断报告错误:', e.message);
   }
 
   return context;
 }
 
 /**
+ * 检索用户个人学习数据（主入口）
+ * 优先语义检索，失败时降级为关键词匹配
+ * @param {number} userId - 用户ID
+ * @param {string} query - 用户问题
+ * @returns {Promise<object>} 检索结果，含_semantic标记
+ */
+async function retrieveContext(userId, query) {
+  // 尝试语义检索
+  try {
+    const semanticResult = await semanticRetrieval(userId, query);
+    if (semanticResult) {
+      console.log('RAG检索模式：语义检索（Embedding余弦相似度）');
+      return semanticResult;
+    }
+  } catch (e) {
+    console.warn('RAG语义检索失败，降级为关键词匹配:', e.message);
+  }
+
+  // 降级为关键词匹配
+  console.log('RAG检索模式：关键词匹配');
+  return keywordRetrieval(userId, query);
+}
+
+/**
  * 将检索结果格式化为AI可理解的上下文文本
- * @param {object} context - retrieveContext的返回值
- * @returns {string|null} 格式化后的上下文，无数据时返回null
  */
 function formatContext(context) {
   const parts = [];

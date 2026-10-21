@@ -132,8 +132,8 @@ router.post('/send', authMiddleware, async (req, res) => {
       LIMIT 20
     `).all(conversationId).reverse();
 
-    // RAG：检索用户个人学习数据作为上下文
-    const ragContext = retrieveContext(req.user.id, content);
+    // RAG：检索用户个人学习数据作为上下文（语义检索，含降级）
+    const ragContext = await retrieveContext(req.user.id, content);
     const formattedContext = formatContext(ragContext);
     const ragUsed = !!formattedContext;
 

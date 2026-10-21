@@ -156,6 +156,21 @@ db.exec(`
 `);
 console.log('✓ AI出题记录表创建完成');
 
+// 向量检索表（RAG语义检索用）
+db.exec(`
+  CREATE TABLE IF NOT EXISTS knowledge_embeddings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    source_type TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    content_text TEXT NOT NULL,
+    vector_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, source_type, source_id)
+  );
+`);
+console.log('✓ 向量检索表创建完成');
+
 // 创建索引
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
