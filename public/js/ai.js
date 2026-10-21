@@ -399,7 +399,7 @@ const AI = {
             // 点击错题节点：跳转到错题本并显示该错题详情
             if (node.detailId) {
               this.pendingMistakeId = node.detailId;
-              window.switchView('mistakes');
+              window.switchView('mistake');
               showToast('已跳转到错题本查看：' + node.label, 'info');
             } else {
               showToast('错题：' + node.label, 'info');
@@ -407,7 +407,7 @@ const AI = {
           } else if (node.type === 'subject') {
             // 点击科目节点：跳转到错题本并筛选该科目
             this.pendingSubjectFilter = node.label;
-            window.switchView('mistakes');
+            window.switchView('mistake');
             showToast('已跳转到错题本，科目：' + node.label, 'info');
           }
         }

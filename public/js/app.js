@@ -96,6 +96,9 @@ function switchView(viewName) {
   }
 }
 
+// 暴露给ai.js等其他脚本调用
+window.switchView = switchView;
+
 // 显示登录页面
 function showAuthPage() {
   document.getElementById('auth-page').classList.remove('hidden');
