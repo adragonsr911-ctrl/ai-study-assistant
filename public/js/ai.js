@@ -20,6 +20,14 @@ marked.setOptions({
   },
 });
 
+// Markdown渲染辅助函数（自动处理LaTeX数学公式）
+function renderMD(text) {
+  if (typeof LatexRenderer !== 'undefined' && text) {
+    text = LatexRenderer.render(text);
+  }
+  return marked.parse(text);
+}
+
 const AI = {
   // 当前对话ID
   currentConversationId: null,
@@ -206,7 +214,7 @@ const AI = {
     let htmlContent = content;
     if (!isUser) {
       // AI消息用Markdown渲染
-      htmlContent = marked.parse(content);
+      htmlContent = renderMD(content);
     } else {
       htmlContent = this.escapeHtml(content).replace(/\n/g, '<br>');
     }
@@ -276,7 +284,7 @@ const AI = {
 
       document.getElementById('knowledge-result').style.display = 'block';
       document.getElementById('knowledge-title').textContent = data.knowledge.topic;
-      document.getElementById('knowledge-content').innerHTML = marked.parse(data.knowledge.content);
+      document.getElementById('knowledge-content').innerHTML = renderMD(data.knowledge.content);
 
       // 代码高亮（如果hljs加载了才执行）
       if (typeof hljs !== 'undefined') {
@@ -341,7 +349,7 @@ const AI = {
             this.currentKnowledgeId = detail.knowledge.id;
             document.getElementById('knowledge-result').style.display = 'block';
             document.getElementById('knowledge-title').textContent = detail.knowledge.topic;
-            document.getElementById('knowledge-content').innerHTML = marked.parse(detail.knowledge.content);
+            document.getElementById('knowledge-content').innerHTML = renderMD(detail.knowledge.content);
             if (typeof hljs !== 'undefined') {
               document.querySelectorAll('#knowledge-content pre code').forEach(block => { try { hljs.highlightElement(block); } catch (e) {} });
             }
@@ -389,7 +397,7 @@ const AI = {
               self.currentKnowledgeId = detail.knowledge.id;
               document.getElementById('knowledge-result').style.display = 'block';
               document.getElementById('knowledge-title').textContent = detail.knowledge.topic;
-              document.getElementById('knowledge-content').innerHTML = marked.parse(detail.knowledge.content);
+              document.getElementById('knowledge-content').innerHTML = renderMD(detail.knowledge.content);
               if (typeof hljs !== 'undefined') {
                 document.querySelectorAll('#knowledge-content pre code').forEach(block => { try { hljs.highlightElement(block); } catch (e) {} });
               }
@@ -466,7 +474,7 @@ const AI = {
 
       document.getElementById('plan-result').style.display = 'block';
       document.getElementById('plan-title').textContent = `${data.plan.subject} - 学习计划`;
-      document.getElementById('plan-content').innerHTML = marked.parse(data.plan.content);
+      document.getElementById('plan-content').innerHTML = renderMD(data.plan.content);
 
       this.loadPlanHistory();
 
@@ -524,7 +532,7 @@ const AI = {
             this.currentPlanId = detail.plan.id;
             document.getElementById('plan-result').style.display = 'block';
             document.getElementById('plan-title').textContent = `${detail.plan.subject} - 学习计划`;
-            document.getElementById('plan-content').innerHTML = marked.parse(detail.plan.content);
+            document.getElementById('plan-content').innerHTML = renderMD(detail.plan.content);
             // 更新保存按钮状态
             const savePlanBtn = document.getElementById('btn-save-plan');
             savePlanBtn.textContent = '已保存 ✓';
@@ -644,7 +652,7 @@ const AI = {
       let similarHtml = '';
       if (m.similar_questions) {
         similarHtml = `<h3 style="margin-top:20px;color:var(--primary-color);">类似练习题</h3>
-          <div class="markdown-body">${marked.parse(m.similar_questions)}</div>`;
+          <div class="markdown-body">${renderMD(m.similar_questions)}</div>`;
       }
 
       document.getElementById('detail-body').innerHTML = `
@@ -668,7 +676,7 @@ const AI = {
           </div>
         </div>
         <h4 style="margin-bottom:8px;color:var(--primary-color);">AI分析</h4>
-        <div class="markdown-body" style="background:var(--surface);padding:16px;border-radius:8px;">${marked.parse(m.analysis)}</div>
+        <div class="markdown-body" style="background:var(--surface);padding:16px;border-radius:8px;">${renderMD(m.analysis)}</div>
         ${similarHtml}
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border-color);">
           <h4 style="margin-bottom:12px;">更新掌握程度</h4>
@@ -917,8 +925,8 @@ const AI = {
             </div>
           </div>
           <h4 style="color:var(--primary-color);margin-bottom:8px;">AI解析</h4>
-          <div class="markdown-body" style="background:var(--surface);padding:16px;border-radius:8px;">${marked.parse(m.analysis || '暂无解析')}</div>
-          ${m.similar_questions ? `<h4 style="color:var(--primary-color);margin:16px 0 8px;">类似练习题</h4><div class="markdown-body" style="background:var(--surface);padding:16px;border-radius:8px;">${marked.parse(m.similar_questions)}</div>` : ''}
+          <div class="markdown-body" style="background:var(--surface);padding:16px;border-radius:8px;">${renderMD(m.analysis || '暂无解析')}</div>
+          ${m.similar_questions ? `<h4 style="color:var(--primary-color);margin:16px 0 8px;">类似练习题</h4><div class="markdown-body" style="background:var(--surface);padding:16px;border-radius:8px;">${renderMD(m.similar_questions)}</div>` : ''}
           <div class="review-feedback">
             <p class="review-feedback-tip">回想得怎么样？选择你的掌握情况（将决定下次复习时间）：</p>
             <div class="review-feedback-btns">
@@ -1275,7 +1283,7 @@ const AI = {
     document.getElementById('diagnosis-result').style.display = 'block';
     document.getElementById('diagnosis-title').textContent = report.title;
     document.getElementById('diagnosis-summary').innerHTML = this.renderDiagnosisSummary(report.summary);
-    document.getElementById('diagnosis-content').innerHTML = marked.parse(report.content);
+    document.getElementById('diagnosis-content').innerHTML = renderMD(report.content);
 
     if (typeof hljs !== 'undefined') {
       document.querySelectorAll('#diagnosis-content pre code').forEach(block => {
