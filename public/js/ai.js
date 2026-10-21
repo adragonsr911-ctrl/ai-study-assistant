@@ -260,6 +260,7 @@ const AI = {
   // 生成知识点
   async generateKnowledge() {
     const topic = document.getElementById('knowledge-topic').value.trim();
+    const subject = document.getElementById('knowledge-subject').value.trim();
     if (!topic) {
       showToast('请输入要拆解的知识点', 'error');
       return;
@@ -268,7 +269,7 @@ const AI = {
     showLoading('AI正在拆解知识点，请稍候...');
 
     try {
-      const data = await API.knowledge.generate(topic);
+      const data = await API.knowledge.generate(topic, subject);
 
       // 记录当前显示的知识点ID
       this.currentKnowledgeId = data.knowledge.id;
@@ -395,9 +396,19 @@ const AI = {
               document.getElementById('knowledge-result').scrollIntoView({ behavior: 'smooth' });
             });
           } else if (node.type === 'mistake') {
-            showToast('错题节点：' + node.label, 'info');
+            // 点击错题节点：跳转到错题本并显示该错题详情
+            if (node.detailId) {
+              this.pendingMistakeId = node.detailId;
+              window.switchView('mistakes');
+              showToast('已跳转到错题本查看：' + node.label, 'info');
+            } else {
+              showToast('错题：' + node.label, 'info');
+            }
           } else if (node.type === 'subject') {
-            showToast('科目：' + node.label, 'info');
+            // 点击科目节点：跳转到错题本并筛选该科目
+            this.pendingSubjectFilter = node.label;
+            window.switchView('mistakes');
+            showToast('已跳转到错题本，科目：' + node.label, 'info');
           }
         }
       });
@@ -534,6 +545,16 @@ const AI = {
   // 加载错题列表
   async loadMistakes(subject = '') {
     try {
+      // 处理从知识图谱跳转过来的pending状态
+      if (this.pendingSubjectFilter) {
+        subject = this.pendingSubjectFilter;
+        const filterEl = document.getElementById('mistake-filter');
+        if (filterEl) filterEl.value = subject;
+        this.pendingSubjectFilter = null;
+      }
+      const targetMistakeId = this.pendingMistakeId;
+      this.pendingMistakeId = null;
+
       const data = await API.mistake.getList(subject);
       const listEl = document.getElementById('mistake-list');
 
@@ -578,6 +599,19 @@ const AI = {
 
       // 更新科目筛选
       this.updateSubjectFilter(data.mistakes);
+
+      // 如果有目标错题ID，自动展开详情
+      if (targetMistakeId) {
+        setTimeout(() => {
+          const targetCard = listEl.querySelector(`.mistake-card[data-id="${targetMistakeId}"]`);
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetCard.style.outline = '2px solid var(--primary-color)';
+            setTimeout(() => { targetCard.style.outline = ''; }, 2000);
+            this.showMistakeDetail(targetMistakeId);
+          }
+        }, 300);
+      }
 
       // 同步刷新今日复习横幅
       this.loadDueReviews();

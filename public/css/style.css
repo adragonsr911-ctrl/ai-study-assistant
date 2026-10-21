@@ -759,7 +759,7 @@ textarea:focus-visible {
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  background: #fafbfc;
+  background: var(--surface);
 }
 
 .btn-new-chat {
@@ -1047,6 +1047,30 @@ textarea:focus-visible {
 /* ==================== 知识点拆解页面 ==================== */
 .knowledge-generator {
   margin-bottom: 24px;
+}
+
+.knowledge-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.knowledge-subject-input {
+  width: 240px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.knowledge-subject-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 .input-group-large {

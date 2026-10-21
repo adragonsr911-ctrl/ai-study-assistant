@@ -73,6 +73,14 @@ db.exec(`
 `);
 console.log('✓ 知识点表创建完成');
 
+// 迁移：给知识点表添加subject字段（旧表没有的话）
+try {
+  db.exec(`ALTER TABLE knowledge_points ADD COLUMN subject TEXT DEFAULT ''`);
+  console.log('✓ 知识点表subject字段迁移完成');
+} catch (e) {
+  // 列已存在，忽略
+}
+
 // 学习计划表
 db.exec(`
   CREATE TABLE IF NOT EXISTS study_plans (

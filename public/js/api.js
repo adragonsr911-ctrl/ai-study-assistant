@@ -146,10 +146,10 @@ const API = {
     },
 
     // 生成知识点拆解
-    async generate(topic) {
+    async generate(topic, subject = '') {
       return API.request('/api/knowledge/generate', {
         method: 'POST',
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify({ topic, subject }),
       });
     },
 

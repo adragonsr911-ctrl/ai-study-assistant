@@ -414,9 +414,15 @@
         </div>
 
         <div class="knowledge-generator">
-          <div class="input-group-large">
-            <input type="text" id="knowledge-topic" placeholder="输入要拆解的知识点，例如：牛顿第二定律、JavaScript闭包、英语定语从句...">
-            <button class="btn-primary" id="btn-generate-knowledge">开始拆解</button>
+          <div class="knowledge-form-row">
+            <input type="text" id="knowledge-subject" class="knowledge-subject-input" placeholder="科目（选填），如：数学、英语、计算机..." list="subject-suggestions">
+            <datalist id="subject-suggestions">
+              <option value="数学"><option value="语文"><option value="英语"><option value="物理"><option value="化学"><option value="生物"><option value="历史"><option value="地理"><option value="政治"><option value="计算机"><option value="Java"><option value="Python"><option value="JavaScript">
+            </datalist>
+            <div class="input-group-large">
+              <input type="text" id="knowledge-topic" placeholder="输入要拆解的知识点，例如：牛顿第二定律、JavaScript闭包、英语定语从句...">
+              <button class="btn-primary" id="btn-generate-knowledge">开始拆解</button>
+            </div>
           </div>
         </div>
 

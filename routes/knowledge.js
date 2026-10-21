@@ -14,7 +14,7 @@ const router = express.Router();
 router.get('/', authMiddleware, (req, res) => {
   try {
     const knowledgeList = db.prepare(`
-      SELECT id, topic, created_at
+      SELECT id, topic, subject, created_at
       FROM knowledge_points
       WHERE user_id = ?
       ORDER BY created_at DESC
@@ -53,11 +53,11 @@ router.get('/:id', authMiddleware, (req, res, next) => {
 /**
  * 生成知识点拆解
  * POST /api/knowledge/generate
- * Body: { topic }
+ * Body: { topic, subject }
  */
 router.post('/generate', authMiddleware, async (req, res) => {
   try {
-    const { topic } = req.body;
+    const { topic, subject } = req.body;
 
     if (!topic || !topic.trim()) {
       return res.status(400).json({ error: '请输入要拆解的知识点' });
@@ -81,9 +81,9 @@ router.post('/generate', authMiddleware, async (req, res) => {
 
     // 保存到数据库
     const result = db.prepare(`
-      INSERT INTO knowledge_points (user_id, topic, content)
-      VALUES (?, ?, ?)
-    `).run(req.user.id, topic.trim(), content);
+      INSERT INTO knowledge_points (user_id, topic, content, subject)
+      VALUES (?, ?, ?, ?)
+    `).run(req.user.id, topic.trim(), content, (subject || '').trim());
 
     // 更新学习记录
     updateStudyRecord(req.user.id, 'knowledge_count', 1);
@@ -93,6 +93,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
         id: result.lastInsertRowid,
         topic: topic.trim(),
         content,
+        subject: (subject || '').trim(),
       },
     });
   } catch (error) {
@@ -202,32 +203,67 @@ router.get('/graph', authMiddleware, (req, res) => {
       });
     });
 
-    // 知识点节点（归到第一个科目或"未分类"）
+    // 知识点节点（按subject字段分组到对应科目）
     let knowledgeCount = 0;
     const knowledgeList = db.prepare(`
-      SELECT id, topic FROM knowledge_points
+      SELECT id, topic, subject FROM knowledge_points
       WHERE user_id = ?
       ORDER BY created_at DESC
-      LIMIT 12
+      LIMIT 15
     `).all(userId);
 
     if (knowledgeList.length > 0) {
-      // 知识点归到第一个科目（简化处理）
-      const firstSubjectId = 'subject_0';
-      knowledgeList.forEach((k, ki) => {
+      // 建立科目名到subjectId的映射
+      const subjectMap = {};
+      subjects.forEach((s, index) => { subjectMap[s.subject] = 'subject_' + index; });
+
+      knowledgeList.forEach((k) => {
         const nodeId = 'knowledge_' + k.id;
         let label = k.topic || '知识点';
         if (label.length > 12) label = label.substring(0, 12) + '...';
+
+        // 确定知识点归属的科目
+        let targetSubjectId = 'subject_0';
+        let targetColor = subjectColors[0];
+        let targetSubjectName = subjects[0] ? subjects[0].subject : '';
+
+        if (k.subject && k.subject.trim()) {
+          if (subjectMap[k.subject]) {
+            // 科目已存在
+            targetSubjectId = subjectMap[k.subject];
+            const idx = subjects.findIndex(s => s.subject === k.subject);
+            targetColor = subjectColors[idx % subjectColors.length];
+            targetSubjectName = k.subject;
+          } else {
+            // 知识点的科目不在错题/计划科目中，添加新科目节点
+            const newIdx = subjects.length;
+            const newSubjectId = 'subject_' + newIdx;
+            subjects.push({ subject: k.subject });
+            subjectMap[k.subject] = newSubjectId;
+            nodes.push({
+              id: newSubjectId,
+              label: k.subject,
+              type: 'subject',
+              color: subjectColors[newIdx % subjectColors.length],
+              size: 'medium',
+            });
+            edges.push({ source: 'root', target: newSubjectId });
+            targetSubjectId = newSubjectId;
+            targetColor = subjectColors[newIdx % subjectColors.length];
+            targetSubjectName = k.subject;
+          }
+        }
+
         nodes.push({
           id: nodeId,
           label,
           type: 'knowledge',
-          subject: subjects[0].subject,
-          color: subjectColors[0],
+          subject: targetSubjectName,
+          color: targetColor,
           size: 'small',
           detailId: k.id,
         });
-        edges.push({ source: firstSubjectId, target: nodeId });
+        edges.push({ source: targetSubjectId, target: nodeId });
         knowledgeCount++;
       });
     }

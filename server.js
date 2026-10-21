@@ -18,6 +18,15 @@ const quizRoutes = require('./routes/quiz');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 数据库迁移：确保知识点表有subject字段
+const db = require('./db');
+try {
+  db.exec(`ALTER TABLE knowledge_points ADD COLUMN subject TEXT DEFAULT ''`);
+  console.log('✓ 数据库迁移：knowledge_points.subject 字段已添加');
+} catch (e) {
+  // 列已存在，忽略
+}
+
 // 中间件
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
