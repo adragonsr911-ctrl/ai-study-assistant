@@ -338,6 +338,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('#knowledge-view-tabs .view-tab').forEach(tab => {
     tab.addEventListener('click', () => AI.switchKnowledgeView(tab.dataset.view));
   });
+  // 图谱布局切换（环图/树图）
+  document.querySelectorAll('#graph-layout-tabs .view-tab').forEach(tab => {
+    tab.addEventListener('click', () => AI.switchGraphLayout(tab.dataset.layout));
+  });
 
   // ---------- 学习计划相关 ----------
   document.getElementById('btn-generate-plan').addEventListener('click', () => AI.generatePlan());

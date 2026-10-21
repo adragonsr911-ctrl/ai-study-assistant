@@ -360,10 +360,10 @@ window.Visualization = (function () {
   }
 
   /**
-   * 渲染知识图谱（环形布局，参考智慧树知识图谱）
+   * 渲染知识图谱（支持树图/环图两种布局，圆角矩形节点）
    * @param {HTMLElement} container
    * @param {Object} data - { nodes: [...], edges: [...], stats: {...} }
-   * @param {Object} options - { onNodeClick: function(node) }
+   * @param {Object} options - { layout: 'ring'|'tree', onNodeClick: function(node) }
    */
   function renderKnowledgeGraph(container, data, options = {}) {
     if (!data || !data.nodes || data.nodes.length === 0) {
@@ -372,54 +372,86 @@ window.Visualization = (function () {
     }
     renderCache.graph = { container, data, options };
     const colors = getColors();
+    const layout = options.layout || 'ring';
 
     const width = container.clientWidth || 600;
     const height = 520;
-    const cx = width / 2;
-    const cy = height / 2;
 
     // 分离不同类型的节点
     const rootNode = data.nodes.find(n => n.type === 'root');
     const subjectNodes = data.nodes.filter(n => n.type === 'subject');
     const childNodes = data.nodes.filter(n => n.type === 'knowledge' || n.type === 'mistake');
 
-    // 计算subject节点位置（围绕中心均匀分布）
-    const subjectRadius = Math.min(width, height) * 0.28;
+    // 节点尺寸
+    const nodeSizes = {
+      root: { w: 96, h: 40, r: 10 },
+      subject: { w: 130, h: 34, r: 8 },
+      child: { w: 150, h: 30, r: 6 },
+    };
+
     const positions = {};
-    if (rootNode) positions[rootNode.id] = { x: cx, y: cy };
 
-    subjectNodes.forEach((node, i) => {
-      const angle = -Math.PI / 2 + (i / subjectNodes.length) * Math.PI * 2;
-      positions[node.id] = {
-        x: cx + subjectRadius * Math.cos(angle),
-        y: cy + subjectRadius * Math.sin(angle),
-        angle,
-      };
-    });
+    if (layout === 'tree') {
+      // ===== 树形布局 =====
+      const rootX = 90;
+      const subjectX = width * 0.38;
+      const childX = width * 0.78;
 
-    // 计算子节点位置（围绕各自的subject节点分布）
-    const childRadius = 115;
-    subjectNodes.forEach((subject) => {
-      const children = childNodes.filter(n => data.edges.some(e =>
-        (e.source === subject.id && e.target === n.id) ||
-        (e.target === subject.id && e.source === n.id)
-      ));
-      if (children.length === 0) return;
+      // 中心节点
+      if (rootNode) positions[rootNode.id] = { x: rootX, y: height / 2 };
 
-      const subPos = positions[subject.id];
-      const baseAngle = subPos.angle;
-      // 子节点在以subject为中心的圆弧上分布，朝向外侧
-      const spreadAngle = Math.max(Math.PI * 0.6, (children.length - 1) * 0.4);
-      children.forEach((child, ci) => {
-        const offset = children.length === 1 ? 0 :
-          (ci / (children.length - 1) - 0.5) * spreadAngle;
-        const angle = baseAngle + offset;
-        positions[child.id] = {
-          x: subPos.x + childRadius * Math.cos(angle),
-          y: subPos.y + childRadius * Math.sin(angle),
-        };
+      // 科目节点垂直排列
+      const subjectSpacing = Math.min(80, (height - 80) / Math.max(subjectNodes.length, 1));
+      const subjectStartY = height / 2 - (subjectNodes.length - 1) * subjectSpacing / 2;
+      subjectNodes.forEach((node, i) => {
+        positions[node.id] = { x: subjectX, y: subjectStartY + i * subjectSpacing };
       });
-    });
+
+      // 子节点：按科目分组，在各自科目右侧垂直排列
+      subjectNodes.forEach((subject) => {
+        const children = childNodes.filter(n => data.edges.some(e =>
+          (e.source === subject.id && e.target === n.id) ||
+          (e.target === subject.id && e.source === n.id)
+        ));
+        if (children.length === 0) return;
+        const subPos = positions[subject.id];
+        const childSpacing = Math.min(38, 140 / Math.max(children.length, 1));
+        const childStartY = subPos.y - (children.length - 1) * childSpacing / 2;
+        children.forEach((child, ci) => {
+          positions[child.id] = { x: childX, y: childStartY + ci * childSpacing };
+        });
+      });
+    } else {
+      // ===== 环形布局 =====
+      const cx = width / 2;
+      const cy = height / 2;
+      if (rootNode) positions[rootNode.id] = { x: cx, y: cy };
+
+      // 科目节点围绕中心均匀分布
+      const subjectRadius = Math.min(width, height) * 0.26;
+      subjectNodes.forEach((node, i) => {
+        const angle = -Math.PI / 2 + (i / subjectNodes.length) * Math.PI * 2;
+        positions[node.id] = { x: cx + subjectRadius * Math.cos(angle), y: cy + subjectRadius * Math.sin(angle), angle };
+      });
+
+      // 子节点围绕各自科目分布
+      const childRadius = 120;
+      subjectNodes.forEach((subject) => {
+        const children = childNodes.filter(n => data.edges.some(e =>
+          (e.source === subject.id && e.target === n.id) ||
+          (e.target === subject.id && e.source === n.id)
+        ));
+        if (children.length === 0) return;
+        const subPos = positions[subject.id];
+        const baseAngle = subPos.angle;
+        const spreadAngle = Math.max(Math.PI * 0.6, (children.length - 1) * 0.4);
+        children.forEach((child, ci) => {
+          const offset = children.length === 1 ? 0 : (ci / (children.length - 1) - 0.5) * spreadAngle;
+          const angle = baseAngle + offset;
+          positions[child.id] = { x: subPos.x + childRadius * Math.cos(angle), y: subPos.y + childRadius * Math.sin(angle) };
+        });
+      });
+    }
 
     // 生成SVG
     let svg = `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="background:transparent;">`;
@@ -428,66 +460,61 @@ window.Visualization = (function () {
     const dotSpacing = 24;
     for (let x = dotSpacing; x < width; x += dotSpacing) {
       for (let y = dotSpacing; y < height; y += dotSpacing) {
-        svg += `<circle cx="${x}" cy="${y}" r="1" fill="${colors.gridLine}" opacity="0.4"/>`;
+        svg += `<circle cx="${x}" cy="${y}" r="1" fill="${colors.gridLine}" opacity="0.35"/>`;
       }
     }
 
-    // 绘制边（贝塞尔曲线）
+    // 绘制边（贝塞尔曲线，颜色与目标节点科目一致）
     data.edges.forEach(edge => {
       const p1 = positions[edge.source];
       const p2 = positions[edge.target];
       if (!p1 || !p2) return;
-      // 控制点在中点，稍微弯曲
-      const mx = (p1.x + p2.x) / 2;
-      const my = (p1.y + p2.y) / 2;
-      const dx = p2.x - p1.x;
-      const dy = p2.y - p1.y;
-      const len = Math.sqrt(dx * dx + dy * dy) || 1;
-      const curve = 0.15;
-      const cpx = mx - dy * curve;
-      const cpy = my + dx * curve;
       const targetNode = data.nodes.find(n => n.id === edge.target) || data.nodes.find(n => n.id === edge.source);
       const strokeColor = targetNode ? targetNode.color : colors.gridLine;
-      svg += `<path d="M${p1.x},${p1.y} Q${cpx},${cpy} ${p2.x},${p2.y}" fill="none" stroke="${strokeColor}" stroke-width="1.5" opacity="0.4"/>`;
+      // 树形布局用水平贝塞尔，环形用普通贝塞尔
+      if (layout === 'tree') {
+        const mx = (p1.x + p2.x) / 2;
+        svg += `<path d="M${p1.x},${p1.y} C${mx},${p1.y} ${mx},${p2.y} ${p2.x},${p2.y}" fill="none" stroke="${strokeColor}" stroke-width="1.5" opacity="0.45"/>`;
+      } else {
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const cpx = mx - dy * 0.12;
+        const cpy = my + dx * 0.12;
+        svg += `<path d="M${p1.x},${p1.y} Q${cpx},${cpy} ${p2.x},${p2.y}" fill="none" stroke="${strokeColor}" stroke-width="1.5" opacity="0.45"/>`;
+      }
     });
 
-    // 绘制节点
+    // 绘制节点（圆角矩形）
     data.nodes.forEach(node => {
       const pos = positions[node.id];
       if (!pos) return;
-
-      let r = 12;
-      let fontSize = 11;
-      let fontWeight = '500';
-      if (node.type === 'root') { r = 32; fontSize = 13; fontWeight = '700'; }
-      else if (node.type === 'subject') { r = 22; fontSize = 12; fontWeight = '600'; }
-
+      const size = nodeSizes[node.type] || nodeSizes.child;
       const nodeColor = node.type === 'root' ? colors.text : node.color;
       const textColor = node.type === 'root' ? colors.grid : '#fff';
+      const x = pos.x - size.w / 2;
+      const y = pos.y - size.h / 2;
 
-      // 节点圆形
       svg += `<g class="kg-node" data-id="${node.id}" data-type="${node.type}" style="cursor:pointer;">`;
-      // 光晕效果（root和subject）
-      if (node.type !== 'small') {
-        svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${r + 4}" fill="${nodeColor}" opacity="0.15"/>`;
+      // 光晕
+      if (node.type !== 'child') {
+        svg += `<rect x="${x - 4}" y="${y - 4}" width="${size.w + 8}" height="${size.h + 8}" rx="${size.r + 3}" fill="${nodeColor}" opacity="0.12"/>`;
       }
-      svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}" fill="${nodeColor}" stroke="${colors.grid}" stroke-width="2"/>`;
+      // 圆角矩形
+      svg += `<rect x="${x}" y="${y}" width="${size.w}" height="${size.h}" rx="${size.r}" fill="${nodeColor}" stroke="${colors.grid}" stroke-width="1.5"/>`;
 
-      // 掌握程度指示（错题节点）
+      // 掌握程度指示（错题节点，右上角小圆点）
       if (node.type === 'mistake' && node.mastery !== undefined) {
         const masteryColor = node.mastery >= 2 ? '#4ade80' : (node.mastery === 1 ? '#fbbf24' : '#f87171');
-        svg += `<circle cx="${pos.x + r * 0.7}" cy="${pos.y - r * 0.7}" r="4" fill="${masteryColor}" stroke="${colors.grid}" stroke-width="1"/>`;
+        svg += `<circle cx="${x + size.w - 2}" cy="${y + 2}" r="4.5" fill="${masteryColor}" stroke="${colors.grid}" stroke-width="1"/>`;
       }
 
-      // 节点文字
-      if (node.type === 'root') {
-        // 中心节点文字在圆内，分两行
-        svg += `<text x="${pos.x}" y="${pos.y - 2}" text-anchor="middle" font-size="11" font-weight="${fontWeight}" fill="${textColor}">知识</text>`;
-        svg += `<text x="${pos.x}" y="${pos.y + 12}" text-anchor="middle" font-size="11" font-weight="${fontWeight}" fill="${textColor}">图谱</text>`;
-      } else {
-        // 其他节点文字在圆下方
-        svg += `<text x="${pos.x}" y="${pos.y + r + 14}" text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${colors.text}">${node.label}</text>`;
-      }
+      // 节点文字（居中）
+      const label = node.type === 'root' ? '知识图谱' : node.label;
+      const fontSize = node.type === 'root' ? 13 : (node.type === 'subject' ? 12 : 11);
+      const fontWeight = node.type === 'root' ? '700' : (node.type === 'subject' ? '600' : '500');
+      svg += `<text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}">${label}</text>`;
       svg += `</g>`;
     });
 

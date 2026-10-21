@@ -360,11 +360,15 @@ const AI = {
   },
 
   // 加载知识图谱
+  // 当前图谱布局
+  currentGraphLayout: 'ring',
+
   async loadKnowledgeGraph() {
     try {
       const data = await API.knowledge.getGraph();
       const graphEl = document.getElementById('knowledge-graph');
       const statsEl = document.getElementById('graph-stats');
+      const self = this;
 
       // 显示统计信息
       if (data.stats) {
@@ -377,10 +381,11 @@ const AI = {
 
       // 渲染图谱
       Visualization.renderKnowledgeGraph(graphEl, data, {
+        layout: self.currentGraphLayout,
         onNodeClick: (node) => {
           if (node.type === 'knowledge' && node.detailId) {
             API.knowledge.getDetail(node.detailId).then(detail => {
-              this.currentKnowledgeId = detail.knowledge.id;
+              self.currentKnowledgeId = detail.knowledge.id;
               document.getElementById('knowledge-result').style.display = 'block';
               document.getElementById('knowledge-title').textContent = detail.knowledge.topic;
               document.getElementById('knowledge-content').innerHTML = marked.parse(detail.knowledge.content);
@@ -400,6 +405,14 @@ const AI = {
       console.error('加载知识图谱失败:', error);
       showToast('加载知识图谱失败', 'error');
     }
+  },
+
+  // 切换图谱布局（环图/树图）
+  switchGraphLayout(layout) {
+    this.currentGraphLayout = layout;
+    document.querySelectorAll('#graph-layout-tabs .view-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#graph-layout-tabs .view-tab[data-layout="${layout}"]`).classList.add('active');
+    this.loadKnowledgeGraph();
   },
 
   // 切换知识点视图（列表/图谱）

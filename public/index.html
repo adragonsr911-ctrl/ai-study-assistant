@@ -440,7 +440,13 @@
             <div class="empty-tip">暂无历史记录</div>
           </div>
           <div class="knowledge-graph-container" id="knowledge-graph-container" style="display:none;">
-            <div class="graph-stats" id="graph-stats"></div>
+            <div class="graph-toolbar">
+              <div class="graph-stats" id="graph-stats"></div>
+              <div class="graph-layout-tabs" id="graph-layout-tabs">
+                <button class="view-tab active" data-layout="ring">环图</button>
+                <button class="view-tab" data-layout="tree">树图</button>
+              </div>
+            </div>
             <div id="knowledge-graph" class="knowledge-graph"></div>
           </div>
         </div>
