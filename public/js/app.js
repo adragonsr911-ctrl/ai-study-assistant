@@ -340,6 +340,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-export-mistakes').addEventListener('click', () => AI.exportMistakes());
   document.getElementById('btn-export-plan').addEventListener('click', () => AI.exportPlan());
 
+  // ---------- 学习看板趋势图切换 ----------
+  document.querySelectorAll('#trend-tabs .chart-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#trend-tabs .chart-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      AI.loadDashboard(parseInt(tab.dataset.days));
+    });
+  });
+
   // 科目筛选
   document.getElementById('mistake-filter').addEventListener('change', (e) => {
     AI.loadMistakes(e.target.value);

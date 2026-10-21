@@ -250,14 +250,24 @@ const API = {
       return API.request('/api/dashboard/summary');
     },
 
-    // 获取学习趋势
-    async getTrend() {
-      return API.request('/api/dashboard/trend');
+    // 获取学习趋势（支持指定天数）
+    async getTrend(days = 7) {
+      return API.request('/api/dashboard/trend?days=' + days);
     },
 
     // 获取科目分布
     async getSubjectDistribution() {
       return API.request('/api/dashboard/subject-distribution');
+    },
+
+    // 获取学习热力图数据（最近12周）
+    async getHeatmap() {
+      return API.request('/api/dashboard/heatmap');
+    },
+
+    // 获取知识点掌握雷达图数据
+    async getRadar() {
+      return API.request('/api/dashboard/radar');
     },
   },
 

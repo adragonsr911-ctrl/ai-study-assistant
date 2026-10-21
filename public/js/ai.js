@@ -1018,12 +1018,14 @@ const AI = {
   // ==================== 数据看板功能 ====================
 
   // 加载看板数据
-  async loadDashboard() {
+  async loadDashboard(days = 7) {
     try {
-      const [summary, trend, distribution] = await Promise.all([
+      const [summary, trend, distribution, heatmap, radar] = await Promise.all([
         API.dashboard.getSummary(),
-        API.dashboard.getTrend(),
+        API.dashboard.getTrend(days),
         API.dashboard.getSubjectDistribution(),
+        API.dashboard.getHeatmap(),
+        API.dashboard.getRadar(),
       ]);
 
       // 更新统计数字
@@ -1034,76 +1036,20 @@ const AI = {
       document.getElementById('stat-plans').textContent = summary.summary.total_plans;
       document.getElementById('stat-days').textContent = summary.summary.study_days;
 
-      // 渲染趋势图
-      this.renderTrendChart(trend.trend);
+      // 渲染学习热力图
+      Visualization.renderHeatmap(document.getElementById('heatmap-chart'), heatmap.heatmap);
 
-      // 渲染科目分布图
-      this.renderSubjectChart(distribution.distribution);
+      // 渲染知识点掌握雷达图
+      Visualization.renderRadar(document.getElementById('radar-chart'), radar.radar);
+
+      // 渲染学习时长趋势折线图
+      Visualization.renderTrendLine(document.getElementById('trend-chart'), trend.trend);
+
+      // 渲染错题分布环形饼图
+      Visualization.renderPie(document.getElementById('subject-chart'), distribution.distribution);
     } catch (error) {
       console.error('加载看板数据失败:', error);
     }
-  },
-
-  // 渲染趋势柱状图
-  renderTrendChart(trend) {
-    const container = document.getElementById('trend-chart');
-    const maxValue = Math.max(...trend.map(t => t.chat_count + t.knowledge_count + t.mistake_count), 1);
-
-    container.innerHTML = `
-      <div class="bar-chart">
-        ${trend.map(day => `
-          <div class="bar-group">
-            <div class="bar-wrapper">
-              <div class="bar" style="height:${(day.chat_count / maxValue * 100)}%" title="答疑:${day.chat_count}"></div>
-              <div class="bar green" style="height:${(day.knowledge_count / maxValue * 100)}%" title="知识点:${day.knowledge_count}"></div>
-              <div class="bar orange" style="height:${(day.mistake_count / maxValue * 100)}%" title="错题:${day.mistake_count}"></div>
-            </div>
-            <div class="bar-label">${day.label}</div>
-          </div>
-        `).join('')}
-      </div>
-      <div style="display:flex;justify-content:center;gap:20px;margin-top:16px;font-size:12px;color:#6b7280;">
-        <span><span style="display:inline-block;width:12px;height:12px;background:var(--primary-color);border-radius:3px;margin-right:4px;"></span>AI答疑</span>
-        <span><span style="display:inline-block;width:12px;height:12px;background:#10b981;border-radius:3px;margin-right:4px;"></span>知识点</span>
-        <span><span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border-radius:3px;margin-right:4px;"></span>错题</span>
-      </div>
-    `;
-  },
-
-  // 渲染科目分布图
-  renderSubjectChart(distribution) {
-    const container = document.getElementById('subject-chart');
-
-    if (distribution.length === 0) {
-      container.innerHTML = `<div class="empty-tip"><span class="empty-icon">${ICONS['chart-column']}</span><p>暂无学习数据，使用几次功能后这里会展示趋势</p></div>`;
-      return;
-    }
-
-    const total = distribution.reduce((sum, item) => sum + item.count, 0);
-    const colors = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#0891b2', '#db2777'];
-
-    // 计算饼图
-    let currentAngle = 0;
-    const gradientStops = distribution.map((item, index) => {
-      const percentage = item.count / total;
-      const startAngle = currentAngle;
-      currentAngle += percentage * 360;
-      return `${colors[index % colors.length]} ${startAngle}deg ${currentAngle}deg`;
-    }).join(', ');
-
-    container.innerHTML = `
-      <div class="pie-chart-container">
-        <div class="pie-chart" style="background: conic-gradient(${gradientStops});"></div>
-        <div class="pie-legend">
-          ${distribution.map((item, index) => `
-            <div class="legend-item">
-              <span class="legend-color" style="background:${colors[index % colors.length]};"></span>
-              <span>${this.escapeHtml(item.subject)} (${item.count}题, ${Math.round(item.count / total * 100)}%)</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
   },
 
   // ==================== AI学习诊断功能 ====================

@@ -707,14 +707,41 @@
         </div>
 
         <div class="dashboard-charts">
+          <div class="chart-card chart-card-wide">
+            <div class="chart-card-header">
+              <h3>学习热力图</h3>
+              <span class="chart-subtitle">最近12周学习活跃度</span>
+            </div>
+            <div class="chart-container" id="heatmap-chart">
+              <div class="empty-tip">暂无数据</div>
+            </div>
+          </div>
           <div class="chart-card">
-            <h3>最近7天学习趋势</h3>
+            <div class="chart-card-header">
+              <h3>知识点掌握雷达</h3>
+              <span class="chart-subtitle">各科错题掌握率</span>
+            </div>
+            <div class="chart-container" id="radar-chart">
+              <div class="empty-tip">暂无数据</div>
+            </div>
+          </div>
+          <div class="chart-card chart-card-wide">
+            <div class="chart-card-header">
+              <h3>学习时长趋势</h3>
+              <div class="chart-tabs" id="trend-tabs">
+                <button class="chart-tab active" data-days="7">7天</button>
+                <button class="chart-tab" data-days="30">30天</button>
+              </div>
+            </div>
             <div class="chart-container" id="trend-chart">
               <div class="empty-tip">暂无数据</div>
             </div>
           </div>
           <div class="chart-card">
-            <h3>错题科目分布</h3>
+            <div class="chart-card-header">
+              <h3>错题科目分布</h3>
+              <span class="chart-subtitle">各科目错题占比</span>
+            </div>
             <div class="chart-container" id="subject-chart">
               <div class="empty-tip">暂无数据</div>
             </div>
@@ -768,6 +795,7 @@
 
   <script src="js/icons.js?v=20261022"></script>
   <script src="js/api.js?v=20261022"></script>
+  <script src="js/visualization.js?v=20261022"></script>
   <script src="js/ai.js?v=20261022"></script>
   <script src="js/app.js?v=20261022"></script>
 </body>
