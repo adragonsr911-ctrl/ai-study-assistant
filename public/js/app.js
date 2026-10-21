@@ -334,6 +334,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('knowledge-topic').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') AI.generateKnowledge();
   });
+  // 知识点列表/图谱视图切换
+  document.querySelectorAll('#knowledge-view-tabs .view-tab').forEach(tab => {
+    tab.addEventListener('click', () => AI.switchKnowledgeView(tab.dataset.view));
+  });
 
   // ---------- 学习计划相关 ----------
   document.getElementById('btn-generate-plan').addEventListener('click', () => AI.generatePlan());

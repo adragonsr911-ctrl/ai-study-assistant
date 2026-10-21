@@ -31,7 +31,9 @@ router.get('/', authMiddleware, (req, res) => {
  * 获取单个知识点详情
  * GET /api/knowledge/:id
  */
-router.get('/:id', authMiddleware, (req, res) => {
+router.get('/:id', authMiddleware, (req, res, next) => {
+  // graph是特殊路由，跳过交给后面的/graph处理
+  if (req.params.id === 'graph') return next();
   try {
     const knowledge = db.prepare(
       'SELECT * FROM knowledge_points WHERE id = ? AND user_id = ?'
@@ -117,6 +119,131 @@ router.delete('/:id', authMiddleware, (req, res) => {
   } catch (error) {
     console.error('删除知识点错误:', error);
     res.status(500).json({ error: '删除知识点失败' });
+  }
+});
+
+/**
+ * 获取知识图谱数据
+ * GET /api/knowledge/graph
+ * 返回节点和边，用于前端SVG渲染知识图谱
+ */
+router.get('/graph', authMiddleware, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const nodes = [];
+    const edges = [];
+
+    // 科目配色
+    const subjectColors = ['#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777', '#65a30d'];
+
+    // 中心节点
+    nodes.push({
+      id: 'root',
+      label: '我的知识图谱',
+      type: 'root',
+      color: '#1e293b',
+      size: 'large',
+    });
+
+    // 从错题本提取科目
+    const subjects = db.prepare(`
+      SELECT DISTINCT subject FROM mistakes WHERE user_id = ? AND subject IS NOT NULL AND subject != ''
+      UNION
+      SELECT DISTINCT subject FROM study_plans WHERE user_id = ? AND subject IS NOT NULL AND subject != ''
+    `).all(userId, userId);
+
+    if (subjects.length === 0) {
+      // 没有科目数据时，返回空图谱
+      res.json({ nodes, edges, stats: { subjects: 0, knowledge: 0, mistakes: 0 } });
+      return;
+    }
+
+    // 科目节点
+    subjects.forEach((s, index) => {
+      const subjectId = 'subject_' + index;
+      nodes.push({
+        id: subjectId,
+        label: s.subject,
+        type: 'subject',
+        color: subjectColors[index % subjectColors.length],
+        size: 'medium',
+      });
+      edges.push({ source: 'root', target: subjectId });
+    });
+
+    // 每个科目下的错题节点
+    let mistakeCount = 0;
+    subjects.forEach((s, index) => {
+      const subjectId = 'subject_' + index;
+      const mistakes = db.prepare(`
+        SELECT id, question, mastery_level FROM mistakes
+        WHERE user_id = ? AND subject = ?
+        ORDER BY created_at DESC
+        LIMIT 8
+      `).all(userId, s.subject);
+
+      mistakes.forEach((m, mi) => {
+        const nodeId = 'mistake_' + m.id;
+        // 截断题目文字
+        let label = m.question || '错题';
+        if (label.length > 12) label = label.substring(0, 12) + '...';
+        nodes.push({
+          id: nodeId,
+          label,
+          type: 'mistake',
+          subject: s.subject,
+          color: subjectColors[index % subjectColors.length],
+          mastery: m.mastery_level,
+          size: 'small',
+          detailId: m.id,
+        });
+        edges.push({ source: subjectId, target: nodeId });
+        mistakeCount++;
+      });
+    });
+
+    // 知识点节点（归到第一个科目或"未分类"）
+    let knowledgeCount = 0;
+    const knowledgeList = db.prepare(`
+      SELECT id, topic FROM knowledge_points
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 12
+    `).all(userId);
+
+    if (knowledgeList.length > 0) {
+      // 知识点归到第一个科目（简化处理）
+      const firstSubjectId = 'subject_0';
+      knowledgeList.forEach((k, ki) => {
+        const nodeId = 'knowledge_' + k.id;
+        let label = k.topic || '知识点';
+        if (label.length > 12) label = label.substring(0, 12) + '...';
+        nodes.push({
+          id: nodeId,
+          label,
+          type: 'knowledge',
+          subject: subjects[0].subject,
+          color: subjectColors[0],
+          size: 'small',
+          detailId: k.id,
+        });
+        edges.push({ source: firstSubjectId, target: nodeId });
+        knowledgeCount++;
+      });
+    }
+
+    res.json({
+      nodes,
+      edges,
+      stats: {
+        subjects: subjects.length,
+        knowledge: knowledgeCount,
+        mistakes: mistakeCount,
+      },
+    });
+  } catch (error) {
+    console.error('获取知识图谱错误:', error);
+    res.status(500).json({ error: '获取知识图谱失败' });
   }
 });
 

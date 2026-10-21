@@ -356,6 +356,154 @@ window.Visualization = (function () {
     if (renderCache.radar) renderRadar(renderCache.radar.container, renderCache.radar.data);
     if (renderCache.trend) renderTrendLine(renderCache.trend.container, renderCache.trend.data, renderCache.trend.options);
     if (renderCache.pie) renderPie(renderCache.pie.container, renderCache.pie.data);
+    if (renderCache.graph) renderKnowledgeGraph(renderCache.graph.container, renderCache.graph.data, renderCache.graph.options);
+  }
+
+  /**
+   * 渲染知识图谱（环形布局，参考智慧树知识图谱）
+   * @param {HTMLElement} container
+   * @param {Object} data - { nodes: [...], edges: [...], stats: {...} }
+   * @param {Object} options - { onNodeClick: function(node) }
+   */
+  function renderKnowledgeGraph(container, data, options = {}) {
+    if (!data || !data.nodes || data.nodes.length === 0) {
+      container.innerHTML = '<div class="empty-tip"><p>暂无知识图谱数据，先添加一些错题和知识点吧</p></div>';
+      return;
+    }
+    renderCache.graph = { container, data, options };
+    const colors = getColors();
+
+    const width = container.clientWidth || 600;
+    const height = 520;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    // 分离不同类型的节点
+    const rootNode = data.nodes.find(n => n.type === 'root');
+    const subjectNodes = data.nodes.filter(n => n.type === 'subject');
+    const childNodes = data.nodes.filter(n => n.type === 'knowledge' || n.type === 'mistake');
+
+    // 计算subject节点位置（围绕中心均匀分布）
+    const subjectRadius = Math.min(width, height) * 0.28;
+    const positions = {};
+    if (rootNode) positions[rootNode.id] = { x: cx, y: cy };
+
+    subjectNodes.forEach((node, i) => {
+      const angle = -Math.PI / 2 + (i / subjectNodes.length) * Math.PI * 2;
+      positions[node.id] = {
+        x: cx + subjectRadius * Math.cos(angle),
+        y: cy + subjectRadius * Math.sin(angle),
+        angle,
+      };
+    });
+
+    // 计算子节点位置（围绕各自的subject节点分布）
+    const childRadius = 115;
+    subjectNodes.forEach((subject) => {
+      const children = childNodes.filter(n => data.edges.some(e =>
+        (e.source === subject.id && e.target === n.id) ||
+        (e.target === subject.id && e.source === n.id)
+      ));
+      if (children.length === 0) return;
+
+      const subPos = positions[subject.id];
+      const baseAngle = subPos.angle;
+      // 子节点在以subject为中心的圆弧上分布，朝向外侧
+      const spreadAngle = Math.max(Math.PI * 0.6, (children.length - 1) * 0.4);
+      children.forEach((child, ci) => {
+        const offset = children.length === 1 ? 0 :
+          (ci / (children.length - 1) - 0.5) * spreadAngle;
+        const angle = baseAngle + offset;
+        positions[child.id] = {
+          x: subPos.x + childRadius * Math.cos(angle),
+          y: subPos.y + childRadius * Math.sin(angle),
+        };
+      });
+    });
+
+    // 生成SVG
+    let svg = `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="background:transparent;">`;
+
+    // 背景点阵网格
+    const dotSpacing = 24;
+    for (let x = dotSpacing; x < width; x += dotSpacing) {
+      for (let y = dotSpacing; y < height; y += dotSpacing) {
+        svg += `<circle cx="${x}" cy="${y}" r="1" fill="${colors.gridLine}" opacity="0.4"/>`;
+      }
+    }
+
+    // 绘制边（贝塞尔曲线）
+    data.edges.forEach(edge => {
+      const p1 = positions[edge.source];
+      const p2 = positions[edge.target];
+      if (!p1 || !p2) return;
+      // 控制点在中点，稍微弯曲
+      const mx = (p1.x + p2.x) / 2;
+      const my = (p1.y + p2.y) / 2;
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const curve = 0.15;
+      const cpx = mx - dy * curve;
+      const cpy = my + dx * curve;
+      const targetNode = data.nodes.find(n => n.id === edge.target) || data.nodes.find(n => n.id === edge.source);
+      const strokeColor = targetNode ? targetNode.color : colors.gridLine;
+      svg += `<path d="M${p1.x},${p1.y} Q${cpx},${cpy} ${p2.x},${p2.y}" fill="none" stroke="${strokeColor}" stroke-width="1.5" opacity="0.4"/>`;
+    });
+
+    // 绘制节点
+    data.nodes.forEach(node => {
+      const pos = positions[node.id];
+      if (!pos) return;
+
+      let r = 12;
+      let fontSize = 11;
+      let fontWeight = '500';
+      if (node.type === 'root') { r = 32; fontSize = 13; fontWeight = '700'; }
+      else if (node.type === 'subject') { r = 22; fontSize = 12; fontWeight = '600'; }
+
+      const nodeColor = node.type === 'root' ? colors.text : node.color;
+      const textColor = node.type === 'root' ? colors.grid : '#fff';
+
+      // 节点圆形
+      svg += `<g class="kg-node" data-id="${node.id}" data-type="${node.type}" style="cursor:pointer;">`;
+      // 光晕效果（root和subject）
+      if (node.type !== 'small') {
+        svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${r + 4}" fill="${nodeColor}" opacity="0.15"/>`;
+      }
+      svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}" fill="${nodeColor}" stroke="${colors.grid}" stroke-width="2"/>`;
+
+      // 掌握程度指示（错题节点）
+      if (node.type === 'mistake' && node.mastery !== undefined) {
+        const masteryColor = node.mastery >= 2 ? '#4ade80' : (node.mastery === 1 ? '#fbbf24' : '#f87171');
+        svg += `<circle cx="${pos.x + r * 0.7}" cy="${pos.y - r * 0.7}" r="4" fill="${masteryColor}" stroke="${colors.grid}" stroke-width="1"/>`;
+      }
+
+      // 节点文字
+      if (node.type === 'root') {
+        // 中心节点文字在圆内，分两行
+        svg += `<text x="${pos.x}" y="${pos.y - 2}" text-anchor="middle" font-size="11" font-weight="${fontWeight}" fill="${textColor}">知识</text>`;
+        svg += `<text x="${pos.x}" y="${pos.y + 12}" text-anchor="middle" font-size="11" font-weight="${fontWeight}" fill="${textColor}">图谱</text>`;
+      } else {
+        // 其他节点文字在圆下方
+        svg += `<text x="${pos.x}" y="${pos.y + r + 14}" text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${colors.text}">${node.label}</text>`;
+      }
+      svg += `</g>`;
+    });
+
+    svg += '</svg>';
+    container.innerHTML = svg;
+
+    // 绑定节点点击事件
+    if (options.onNodeClick) {
+      container.querySelectorAll('.kg-node').forEach(el => {
+        el.addEventListener('click', () => {
+          const nodeId = el.getAttribute('data-id');
+          const node = data.nodes.find(n => n.id === nodeId);
+          if (node) options.onNodeClick(node);
+        });
+      });
+    }
   }
 
   // 暴露给app.js的主题切换回调
@@ -368,6 +516,7 @@ window.Visualization = (function () {
     renderRadar,
     renderTrendLine,
     renderPie,
+    renderKnowledgeGraph,
     redrawAll,
   };
 })();

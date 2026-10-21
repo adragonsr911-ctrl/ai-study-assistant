@@ -429,9 +429,19 @@
         </div>
 
         <div class="knowledge-history">
-          <h3>历史记录</h3>
+          <div class="history-header">
+            <h3>历史记录</h3>
+            <div class="view-tabs" id="knowledge-view-tabs">
+              <button class="view-tab active" data-view="list">列表</button>
+              <button class="view-tab" data-view="graph">知识图谱</button>
+            </div>
+          </div>
           <div class="history-list" id="knowledge-history-list">
             <div class="empty-tip">暂无历史记录</div>
+          </div>
+          <div class="knowledge-graph-container" id="knowledge-graph-container" style="display:none;">
+            <div class="graph-stats" id="graph-stats"></div>
+            <div id="knowledge-graph" class="knowledge-graph"></div>
           </div>
         </div>
       </div>

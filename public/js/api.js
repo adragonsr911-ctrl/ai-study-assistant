@@ -159,6 +159,11 @@ const API = {
         method: 'DELETE',
       });
     },
+
+    // 获取知识图谱数据
+    async getGraph() {
+      return API.request('/api/knowledge/graph');
+    },
   },
 
   // ==================== 学习计划相关 ====================

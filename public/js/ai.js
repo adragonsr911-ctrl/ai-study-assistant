@@ -359,6 +359,66 @@ const AI = {
     }
   },
 
+  // 加载知识图谱
+  async loadKnowledgeGraph() {
+    try {
+      const data = await API.knowledge.getGraph();
+      const graphEl = document.getElementById('knowledge-graph');
+      const statsEl = document.getElementById('graph-stats');
+
+      // 显示统计信息
+      if (data.stats) {
+        statsEl.innerHTML = `
+          <div class="graph-stat-item"><span class="graph-stat-num">${data.stats.subjects}</span><span class="graph-stat-label">科目</span></div>
+          <div class="graph-stat-item"><span class="graph-stat-num">${data.stats.knowledge}</span><span class="graph-stat-label">知识点</span></div>
+          <div class="graph-stat-item"><span class="graph-stat-num">${data.stats.mistakes}</span><span class="graph-stat-label">错题</span></div>
+        `;
+      }
+
+      // 渲染图谱
+      Visualization.renderKnowledgeGraph(graphEl, data, {
+        onNodeClick: (node) => {
+          if (node.type === 'knowledge' && node.detailId) {
+            API.knowledge.getDetail(node.detailId).then(detail => {
+              this.currentKnowledgeId = detail.knowledge.id;
+              document.getElementById('knowledge-result').style.display = 'block';
+              document.getElementById('knowledge-title').textContent = detail.knowledge.topic;
+              document.getElementById('knowledge-content').innerHTML = marked.parse(detail.knowledge.content);
+              if (typeof hljs !== 'undefined') {
+                document.querySelectorAll('#knowledge-content pre code').forEach(block => { try { hljs.highlightElement(block); } catch (e) {} });
+              }
+              document.getElementById('knowledge-result').scrollIntoView({ behavior: 'smooth' });
+            });
+          } else if (node.type === 'mistake') {
+            showToast('错题节点：' + node.label, 'info');
+          } else if (node.type === 'subject') {
+            showToast('科目：' + node.label, 'info');
+          }
+        }
+      });
+    } catch (error) {
+      console.error('加载知识图谱失败:', error);
+      showToast('加载知识图谱失败', 'error');
+    }
+  },
+
+  // 切换知识点视图（列表/图谱）
+  switchKnowledgeView(viewName) {
+    const listEl = document.getElementById('knowledge-history-list');
+    const graphEl = document.getElementById('knowledge-graph-container');
+    document.querySelectorAll('#knowledge-view-tabs .view-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#knowledge-view-tabs .view-tab[data-view="${viewName}"]`).classList.add('active');
+
+    if (viewName === 'graph') {
+      listEl.style.display = 'none';
+      graphEl.style.display = 'block';
+      this.loadKnowledgeGraph();
+    } else {
+      listEl.style.display = 'block';
+      graphEl.style.display = 'none';
+    }
+  },
+
   // ==================== 学习计划功能 ====================
 
   // 生成学习计划
