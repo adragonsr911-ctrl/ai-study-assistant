@@ -111,6 +111,7 @@ db.exec(`
     review_count INTEGER DEFAULT 0,
     next_review_at TEXT,
     last_reviewed_at TEXT,
+    image_path TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );

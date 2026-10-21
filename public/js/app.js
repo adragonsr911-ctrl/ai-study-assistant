@@ -358,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 打开添加错题弹窗
   document.getElementById('btn-add-mistake').addEventListener('click', () => {
+    AI.resetMistakeImage();
     document.getElementById('mistake-modal').classList.remove('hidden');
   });
 
@@ -371,6 +372,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 提交错题
   document.getElementById('modal-submit').addEventListener('click', () => AI.submitMistake());
+
+  // 错题图片上传
+  document.getElementById('mistake-upload-area').addEventListener('click', (e) => {
+    if (e.target.closest('.upload-actions')) return;
+    document.getElementById('mistake-image-input').click();
+  });
+  document.getElementById('mistake-image-input').addEventListener('change', (e) => {
+    if (e.target.files[0]) {
+      AI.handleMistakeImageSelect(e.target.files[0]);
+    }
+  });
+  document.getElementById('btn-recognize-image').addEventListener('click', (e) => {
+    e.stopPropagation();
+    AI.recognizeMistakeImage();
+  });
+  document.getElementById('btn-remove-image').addEventListener('click', (e) => {
+    e.stopPropagation();
+    AI.resetMistakeImage();
+  });
 
   // 关闭详情弹窗
   document.getElementById('detail-close').addEventListener('click', () => {

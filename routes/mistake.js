@@ -4,6 +4,8 @@ const db = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { callDoubao, SYSTEM_PROMPTS } = require('../utils/doubao');
 const { updateStudyRecord } = require('../utils/studyRecord');
+const { recognizeMistakeImage } = require('../utils/vision');
+const path = require('path');
 
 const router = express.Router();
 
@@ -61,14 +63,14 @@ router.get('/', authMiddleware, (req, res) => {
 
     if (subject) {
       mistakes = db.prepare(`
-        SELECT id, subject, question, mastery_level, review_count, next_review_at, last_reviewed_at, created_at
+        SELECT id, subject, question, mastery_level, review_count, next_review_at, last_reviewed_at, created_at, image_path
         FROM mistakes
         WHERE user_id = ? AND subject = ?
         ORDER BY created_at DESC
       `).all(req.user.id, subject);
     } else {
       mistakes = db.prepare(`
-        SELECT id, subject, question, mastery_level, review_count, next_review_at, last_reviewed_at, created_at
+        SELECT id, subject, question, mastery_level, review_count, next_review_at, last_reviewed_at, created_at, image_path
         FROM mistakes
         WHERE user_id = ?
         ORDER BY created_at DESC
@@ -111,13 +113,48 @@ router.get('/:id', authMiddleware, (req, res) => {
 });
 
 /**
+ * AI识别错题图片
+ * POST /api/mistake/recognize
+ * Body: { image_path }  // 上传后返回的文件名或路径
+ */
+router.post('/recognize', authMiddleware, async (req, res) => {
+  try {
+    const { image_path } = req.body;
+    if (!image_path) {
+      return res.status(400).json({ error: '缺少图片路径' });
+    }
+
+    // 构造本地路径（支持传文件名或完整路径）
+    let localPath;
+    if (image_path.startsWith('/uploads/')) {
+      localPath = path.join(__dirname, '..', 'uploads', path.basename(image_path));
+    } else {
+      localPath = path.join(__dirname, '..', 'uploads', image_path);
+    }
+
+    const fs = require('fs');
+    if (!fs.existsSync(localPath)) {
+      return res.status(404).json({ error: '图片文件不存在' });
+    }
+
+    // 调用视觉模型识别
+    const result = await recognizeMistakeImage(localPath);
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('识别错题图片错误:', error);
+    res.status(500).json({ error: '识别失败：' + error.message });
+  }
+});
+
+/**
  * 添加错题并生成AI分析
  * POST /api/mistake/add
- * Body: { subject, question, your_answer, correct_answer }
+ * Body: { subject, question, your_answer, correct_answer, image_path }
  */
 router.post('/add', authMiddleware, async (req, res) => {
   try {
-    const { subject, question, your_answer, correct_answer } = req.body;
+    const { subject, question, your_answer, correct_answer, image_path } = req.body;
 
     if (!subject || !question) {
       return res.status(400).json({ error: '科目和题目内容不能为空' });
@@ -154,8 +191,8 @@ router.post('/add', authMiddleware, async (req, res) => {
 
     // 保存到数据库
     const result = db.prepare(`
-      INSERT INTO mistakes (user_id, subject, question, your_answer, correct_answer, analysis, similar_questions, next_review_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO mistakes (user_id, subject, question, your_answer, correct_answer, analysis, similar_questions, next_review_at, image_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       req.user.id,
       subject,
@@ -164,7 +201,8 @@ router.post('/add', authMiddleware, async (req, res) => {
       correct_answer || '',
       aiAnalysis,
       similarQuestions,
-      today
+      today,
+      image_path || ''
     );
 
     // 更新学习记录

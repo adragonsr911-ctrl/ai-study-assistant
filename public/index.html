@@ -540,6 +540,29 @@
               <button class="modal-close" id="modal-close">&times;</button>
             </div>
             <div class="modal-body">
+              <!-- 图片上传区域 -->
+              <div class="mistake-image-upload">
+                <div class="upload-area" id="mistake-upload-area">
+                  <input type="file" id="mistake-image-input" accept="image/*" capture="environment" style="display:none;">
+                  <div class="upload-placeholder" id="mistake-upload-placeholder">
+                    <span class="upload-icon" data-icon="image"></span>
+                    <p>点击上传错题照片</p>
+                    <span class="upload-hint">支持JPG/PNG，AI自动识别题目和答案</span>
+                  </div>
+                  <div class="upload-preview hidden" id="mistake-upload-preview">
+                    <img id="mistake-preview-img" alt="错题预览">
+                    <div class="upload-actions">
+                      <button class="btn-secondary btn-sm" id="btn-recognize-image">AI识别题目</button>
+                      <button class="btn-ghost btn-sm" id="btn-remove-image">重新上传</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="recognize-status hidden" id="mistake-recognize-status">
+                  <span class="loading-spinner"></span>
+                  <span>AI正在识别题目，请稍候...</span>
+                </div>
+              </div>
+
               <div class="form-group">
                 <label>科目 *</label>
                 <input type="text" id="mistake-subject" placeholder="例如：高等数学" list="mistake-subject-suggestions">

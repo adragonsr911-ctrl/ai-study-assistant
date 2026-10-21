@@ -219,6 +219,29 @@ const API = {
       });
     },
 
+    // AI识别错题图片
+    async recognize(imagePath) {
+      return API.request('/api/mistake/recognize', {
+        method: 'POST',
+        body: JSON.stringify({ image_path: imagePath }),
+      });
+    },
+
+    // 上传错题图片
+    async uploadImage(file) {
+      const formData = new FormData();
+      formData.append('image', file);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/upload/mistake-image', {
+        method: 'POST',
+        headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '上传失败');
+      return data;
+    },
+
     // 更新掌握程度
     async updateMastery(id, level) {
       return API.request(`/api/mistake/${id}/mastery`, {

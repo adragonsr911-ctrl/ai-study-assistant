@@ -652,6 +652,7 @@ const AI = {
           <span class="subject-tag">${this.escapeHtml(m.subject)}</span>
           <span class="mastery-badge level-${m.mastery_level}" style="margin-left:8px;">${masteryLabels[m.mastery_level]}</span>
         </div>
+        ${m.image_path ? `<div class="mistake-detail-image"><img src="/uploads/${m.image_path}" alt="错题图片"></div>` : ''}
         <div style="margin-bottom:16px;">
           <h4 style="margin-bottom:8px;color:var(--text-primary);">题目</h4>
           <p style="background:var(--surface);padding:12px;border-radius:8px;white-space:pre-wrap;">${this.escapeHtml(m.question)}</p>
@@ -710,6 +711,9 @@ const AI = {
   },
 
   // 提交错题
+  // 当前上传的错题图片路径
+  currentMistakeImage: '',
+
   async submitMistake() {
     const subject = document.getElementById('mistake-subject').value.trim();
     const question = document.getElementById('mistake-question').value.trim();
@@ -729,6 +733,7 @@ const AI = {
         question,
         your_answer: yourAnswer,
         correct_answer: correctAnswer,
+        image_path: this.currentMistakeImage,
       });
 
       // 清空表单
@@ -736,6 +741,7 @@ const AI = {
       document.getElementById('mistake-question').value = '';
       document.getElementById('mistake-your-answer').value = '';
       document.getElementById('mistake-correct-answer').value = '';
+      this.resetMistakeImage();
 
       document.getElementById('mistake-modal').classList.add('hidden');
       this.loadMistakes();
@@ -744,6 +750,83 @@ const AI = {
       showToast('添加失败：' + error.message, 'error');
     } finally {
       hideLoading();
+    }
+  },
+
+  // 重置错题图片上传状态
+  resetMistakeImage() {
+    this.currentMistakeImage = '';
+    document.getElementById('mistake-image-input').value = '';
+    document.getElementById('mistake-upload-placeholder').classList.remove('hidden');
+    document.getElementById('mistake-upload-preview').classList.add('hidden');
+    document.getElementById('mistake-recognize-status').classList.add('hidden');
+    document.getElementById('mistake-preview-img').src = '';
+  },
+
+  // 处理错题图片选择
+  async handleMistakeImageSelect(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('请选择图片文件', 'error');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('图片不能超过10MB', 'error');
+      return;
+    }
+
+    // 显示预览
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      document.getElementById('mistake-preview-img').src = e.target.result;
+      document.getElementById('mistake-upload-placeholder').classList.add('hidden');
+      document.getElementById('mistake-upload-preview').classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+
+    // 上传到服务器
+    try {
+      const result = await API.mistake.uploadImage(file);
+      this.currentMistakeImage = result.filename;
+      showToast('图片上传成功，点击"AI识别题目"自动填充', 'success');
+    } catch (error) {
+      showToast('图片上传失败：' + error.message, 'error');
+      this.resetMistakeImage();
+    }
+  },
+
+  // AI识别错题图片
+  async recognizeMistakeImage() {
+    if (!this.currentMistakeImage) {
+      showToast('请先上传错题图片', 'error');
+      return;
+    }
+
+    document.getElementById('mistake-recognize-status').classList.remove('hidden');
+
+    try {
+      const result = await API.mistake.recognize(this.currentMistakeImage);
+      const data = result.data;
+
+      // 自动填充表单
+      if (data.subject) {
+        document.getElementById('mistake-subject').value = data.subject;
+      }
+      if (data.question) {
+        document.getElementById('mistake-question').value = data.question;
+      }
+      if (data.your_answer) {
+        document.getElementById('mistake-your-answer').value = data.your_answer;
+      }
+      if (data.correct_answer) {
+        document.getElementById('mistake-correct-answer').value = data.correct_answer;
+      }
+
+      showToast('识别完成，请核对后提交', 'success');
+    } catch (error) {
+      showToast('识别失败：' + error.message, 'error');
+    } finally {
+      document.getElementById('mistake-recognize-status').classList.add('hidden');
     }
   },
 
