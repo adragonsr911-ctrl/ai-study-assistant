@@ -376,7 +376,8 @@ window.Visualization = (function () {
     const layout = options.layout || 'ring';
 
     const width = container.clientWidth || 600;
-    const height = 520;
+    const totalNodes = data.nodes.length;
+    const height = Math.max(600, 480 + totalNodes * 22);
 
     // 分离不同类型的节点
     const rootNode = data.nodes.find(n => n.type === 'root');
@@ -435,8 +436,11 @@ window.Visualization = (function () {
         positions[node.id] = { x: cx + subjectRadius * Math.cos(angle), y: cy + subjectRadius * Math.sin(angle), angle };
       });
 
-      // 子节点围绕各自科目分布
-      const childRadius = 120;
+      // 子节点围绕各自科目分布（动态半径避免重叠）
+      const maxChildren = Math.max(...subjectNodes.map(s => childNodes.filter(n => data.edges.some(e =>
+        (e.source === s.id && e.target === n.id) || (e.target === s.id && e.source === n.id)
+      )).length), 1);
+      const childRadius = Math.max(130, 90 + maxChildren * 18);
       subjectNodes.forEach((subject) => {
         const children = childNodes.filter(n => data.edges.some(e =>
           (e.source === subject.id && e.target === n.id) ||
@@ -445,7 +449,7 @@ window.Visualization = (function () {
         if (children.length === 0) return;
         const subPos = positions[subject.id];
         const baseAngle = subPos.angle;
-        const spreadAngle = Math.max(Math.PI * 0.6, (children.length - 1) * 0.4);
+        const spreadAngle = Math.max(Math.PI * 0.7, (children.length - 1) * 0.45);
         children.forEach((child, ci) => {
           const offset = children.length === 1 ? 0 : (ci / (children.length - 1) - 0.5) * spreadAngle;
           const angle = baseAngle + offset;
@@ -497,13 +501,13 @@ window.Visualization = (function () {
       const x = pos.x - size.w / 2;
       const y = pos.y - size.h / 2;
 
-      svg += `<g class="kg-node" data-id="${node.id}" data-type="${node.type}" style="cursor:pointer;">`;
+      svg += `<g class="kg-node kg-node-${node.type}" data-id="${node.id}" data-type="${node.type}" style="cursor:pointer;transition:transform 0.2s ease;">`;
       // 光晕
       if (node.type !== 'child') {
-        svg += `<rect x="${x - 4}" y="${y - 4}" width="${size.w + 8}" height="${size.h + 8}" rx="${size.r + 3}" fill="${nodeColor}" opacity="0.12"/>`;
+        svg += `<rect class="kg-glow" x="${x - 4}" y="${y - 4}" width="${size.w + 8}" height="${size.h + 8}" rx="${size.r + 3}" fill="${nodeColor}" opacity="0.12" style="transition:opacity 0.2s ease;"/>`;
       }
       // 圆角矩形
-      svg += `<rect x="${x}" y="${y}" width="${size.w}" height="${size.h}" rx="${size.r}" fill="${nodeColor}" stroke="${colors.grid}" stroke-width="1.5"/>`;
+      svg += `<rect class="kg-rect" x="${x}" y="${y}" width="${size.w}" height="${size.h}" rx="${size.r}" fill="${nodeColor}" stroke="${colors.grid}" stroke-width="1.5" style="transition:all 0.2s ease;"/>`;
 
       // 掌握程度指示（错题节点，右上角小圆点）
       if (node.type === 'mistake' && node.mastery !== undefined) {

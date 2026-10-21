@@ -661,9 +661,9 @@ textarea:focus-visible {
 }
 
 .btn-theme-toggle {
-  background: none;
+  background: var(--surface);
   border: 1px solid var(--border-color);
-  width: 32px;
+  width: 36px;
   height: 32px;
   border-radius: var(--radius-sm);
   display: flex;
@@ -673,6 +673,20 @@ textarea:focus-visible {
   color: var(--text-secondary);
   transition: all var(--t-fast);
   padding: 0;
+  position: relative;
+}
+
+.btn-theme-toggle::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2px;
+  background: var(--primary-color);
+  border-radius: 1px;
+  transition: width 0.2s ease;
 }
 
 .btn-theme-toggle:hover {
@@ -681,17 +695,21 @@ textarea:focus-visible {
   background: var(--primary-light);
 }
 
+.btn-theme-toggle:hover::after {
+  width: 60%;
+}
+
 .btn-theme-toggle .theme-icon {
   width: 16px;
   height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.3s ease;
 }
 
-.btn-theme-toggle .theme-icon svg {
-  width: 16px;
-  height: 16px;
+.btn-theme-toggle:hover .theme-icon {
+  transform: rotate(15deg);
 }
 
 /* 主内容区 */
@@ -1330,19 +1348,37 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 .knowledge-graph svg {
   max-width: 100%;
+  flex-shrink: 0;
 }
 
-.kg-node:hover circle:first-of-type {
-  opacity: 0.25;
+/* 知识图谱节点hover效果 */
+.kg-node {
+  transition: transform 0.2s ease;
 }
 
-.kg-node:hover circle:nth-of-type(2) {
-  stroke: var(--primary-color);
-  stroke-width: 3;
+.kg-node:hover {
+  transform: scale(1.08);
+}
+
+.kg-node:hover .kg-glow {
+  opacity: 0.28 !important;
+}
+
+.kg-node:hover .kg-rect {
+  stroke: var(--primary-color) !important;
+  stroke-width: 2.5 !important;
+  filter: brightness(1.1);
+}
+
+.kg-node-child:hover .kg-rect {
+  stroke: var(--primary-color) !important;
+  stroke-width: 2 !important;
 }
 
 /* ==================== 学习计划页面 ==================== */
@@ -2174,14 +2210,16 @@ textarea:focus-visible {
   top: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--text-primary);
-  color: white;
+  background: #1e293b;
+  color: #f1f5f9;
   padding: 12px 24px;
   border-radius: var(--radius-sm);
   font-size: 14px;
   z-index: 2000;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   animation: toastIn 0.3s ease;
+  max-width: 80vw;
+  text-align: center;
 }
 
 .toast.success {
