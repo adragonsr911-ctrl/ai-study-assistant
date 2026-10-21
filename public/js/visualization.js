@@ -98,9 +98,10 @@ window.Visualization = (function () {
 
     let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">`;
 
-    // 月份标签
+    // 月份标签（在该月第一周的中间位置）
     monthLabels.forEach(m => {
-      svg += `<text x="${labelWidth + m.week * weekWidth}" y="12" font-size="10" fill="${colors.axis}">${m.label}</text>`;
+      const weekCenterX = labelWidth + m.week * weekWidth + weekWidth / 2;
+      svg += `<text x="${weekCenterX}" y="12" font-size="10" fill="${colors.axis}" text-anchor="middle">${m.label}</text>`;
     });
 
     // 星期标签
@@ -108,7 +109,7 @@ window.Visualization = (function () {
       svg += `<text x="2" y="${monthLabelHeight + pos * weekWidth + cellSize - 2}" font-size="9" fill="${colors.axis}">${dayLabels[i]}</text>`;
     });
 
-    // 热力格子
+    // 热力格子（加边框让所有格子都可见）
     weeks.forEach((week, wi) => {
       week.forEach((day, di) => {
         if (day === null) return;
@@ -116,7 +117,7 @@ window.Visualization = (function () {
         const y = monthLabelHeight + di * weekWidth;
         const color = colors.heatmap[day.level] || colors.heatmap[0];
         const title = `${day.date}：学习${day.study_minutes}分钟，活跃度${day.activity}`;
-        svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${color}" data-date="${day.date}"><title>${title}</title></rect>`;
+        svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${color}" stroke="${colors.gridLine}" stroke-width="0.5" data-date="${day.date}"><title>${title}</title></rect>`;
       });
     });
 
