@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const ARK_API_KEY = process.env.ARK_API_KEY;
-const VISION_MODEL = process.env.VISION_MODEL || 'doubao-1.5-vision-pro';
+const ARK_API_KEY = process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY;
+// 优先用VISION_MODEL，没有就用DOUBAO_MODEL（DeepSeek-V4-Flash正式版，支持多模态）
+const VISION_MODEL = process.env.VISION_MODEL || process.env.DOUBAO_MODEL;
 const ARK_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 /**
