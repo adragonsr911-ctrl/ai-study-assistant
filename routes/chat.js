@@ -12,9 +12,9 @@ const router = express.Router();
  * 获取对话列表
  * GET /api/chat/conversations
  */
-router.get('/conversations', authMiddleware, (req, res) => {
+router.get('/conversations', authMiddleware, async (req, res) => {
   try {
-    const conversations = db.prepare(`
+    const conversations = await db.prepare(`
       SELECT id, title, created_at, updated_at
       FROM conversations
       WHERE user_id = ?
@@ -32,10 +32,10 @@ router.get('/conversations', authMiddleware, (req, res) => {
  * 创建新对话
  * POST /api/chat/conversations
  */
-router.post('/conversations', authMiddleware, (req, res) => {
+router.post('/conversations', authMiddleware, async (req, res) => {
   try {
     const { title } = req.body;
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO conversations (user_id, title)
       VALUES (?, ?)
     `).run(req.user.id, title || '新对话');
@@ -56,12 +56,12 @@ router.post('/conversations', authMiddleware, (req, res) => {
  * 获取对话历史消息
  * GET /api/chat/conversations/:id/messages
  */
-router.get('/conversations/:id/messages', authMiddleware, (req, res) => {
+router.get('/conversations/:id/messages', authMiddleware, async (req, res) => {
   try {
     const conversationId = req.params.id;
 
     // 验证对话归属
-    const conversation = db.prepare(
+    const conversation = await db.prepare(
       'SELECT id, title FROM conversations WHERE id = ? AND user_id = ?'
     ).get(conversationId, req.user.id);
 
@@ -69,7 +69,7 @@ router.get('/conversations/:id/messages', authMiddleware, (req, res) => {
       return res.status(404).json({ error: '对话不存在' });
     }
 
-    const messages = db.prepare(`
+    const messages = await db.prepare(`
       SELECT id, role, content, created_at
       FROM messages
       WHERE conversation_id = ?
@@ -101,14 +101,14 @@ router.post('/send', authMiddleware, async (req, res) => {
     // 如果没有提供conversation_id，创建新对话
     if (!conversationId) {
       const title = content.length > 20 ? content.substring(0, 20) + '...' : content;
-      const result = db.prepare(`
+      const result = await db.prepare(`
         INSERT INTO conversations (user_id, title)
         VALUES (?, ?)
       `).run(req.user.id, title);
       conversationId = result.lastInsertRowid;
     } else {
       // 验证对话归属
-      const conversation = db.prepare(
+      const conversation = await db.prepare(
         'SELECT id FROM conversations WHERE id = ? AND user_id = ?'
       ).get(conversationId, req.user.id);
 
@@ -118,19 +118,19 @@ router.post('/send', authMiddleware, async (req, res) => {
     }
 
     // 保存用户消息
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO messages (conversation_id, role, content)
       VALUES (?, 'user', ?)
     `).run(conversationId, content);
 
     // 获取历史消息（最近20条，控制token）
-    const historyMessages = db.prepare(`
+    const historyMessages = (await db.prepare(`
       SELECT role, content
       FROM messages
       WHERE conversation_id = ?
       ORDER BY created_at DESC
       LIMIT 20
-    `).all(conversationId).reverse();
+    `).all(conversationId)).reverse();
 
     // RAG：检索用户个人学习数据作为上下文（语义检索，含降级）
     const ragContext = await retrieveContext(req.user.id, content);
@@ -162,17 +162,17 @@ router.post('/send', authMiddleware, async (req, res) => {
     }
 
     // 保存AI回复
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO messages (conversation_id, role, content)
       VALUES (?, 'assistant', ?)
     `).run(conversationId, aiReply);
 
     // 更新对话时间
-    db.prepare('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    await db.prepare('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(conversationId);
 
     // 更新学习记录
-    updateStudyRecord(req.user.id, 'chat_count', 1);
+    await updateStudyRecord(req.user.id, 'chat_count', 1);
 
     res.json({
       conversation_id: conversationId,
@@ -189,11 +189,11 @@ router.post('/send', authMiddleware, async (req, res) => {
  * 删除对话
  * DELETE /api/chat/conversations/:id
  */
-router.delete('/conversations/:id', authMiddleware, (req, res) => {
+router.delete('/conversations/:id', authMiddleware, async (req, res) => {
   try {
     const conversationId = req.params.id;
 
-    const result = db.prepare(
+    const result = await db.prepare(
       'DELETE FROM conversations WHERE id = ? AND user_id = ?'
     ).run(conversationId, req.user.id);
 

@@ -10,9 +10,9 @@ const router = express.Router();
  * 获取学习计划列表
  * GET /api/plan
  */
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const plans = db.prepare(`
+    const plans = await db.prepare(`
       SELECT id, subject, exam_date, daily_hours, created_at
       FROM study_plans
       WHERE user_id = ?
@@ -30,9 +30,9 @@ router.get('/', authMiddleware, (req, res) => {
  * 获取单个学习计划详情
  * GET /api/plan/:id
  */
-router.get('/:id', authMiddleware, (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const plan = db.prepare(
+    const plan = await db.prepare(
       'SELECT * FROM study_plans WHERE id = ? AND user_id = ?'
     ).get(req.params.id, req.user.id);
 
@@ -104,7 +104,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
     }
 
     // 保存到数据库
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO study_plans (user_id, subject, exam_date, daily_hours, content)
       VALUES (?, ?, ?, ?, ?)
     `).run(req.user.id, subject, exam_date, hours, content);
@@ -128,9 +128,9 @@ router.post('/generate', authMiddleware, async (req, res) => {
  * 删除学习计划
  * DELETE /api/plan/:id
  */
-router.delete('/:id', authMiddleware, (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const result = db.prepare(
+    const result = await db.prepare(
       'DELETE FROM study_plans WHERE id = ? AND user_id = ?'
     ).run(req.params.id, req.user.id);
 

@@ -1,11 +1,13 @@
 // 数据库自动建表模块
-// 服务器启动时自动调用，确保所有表存在
+// 服务器启动时自动调用，确保所有表存在。
+// 注意：适配层已做方言转换（AUTOINCREMENT -> BIGSERIAL 等），
+//       因此这里保持 SQLite 风格写法即可，两种模式都能跑。
 
 const db = require('./index');
 
-function initDatabase() {
+async function initDatabase() {
   // 用户表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
@@ -18,7 +20,7 @@ function initDatabase() {
   `);
 
   // 对话会话表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS conversations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -30,7 +32,7 @@ function initDatabase() {
   `);
 
   // 对话消息表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       conversation_id INTEGER NOT NULL,
@@ -42,7 +44,7 @@ function initDatabase() {
   `);
 
   // 知识点表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge_points (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -54,7 +56,7 @@ function initDatabase() {
   `);
 
   // 学习计划表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS study_plans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -68,7 +70,7 @@ function initDatabase() {
   `);
 
   // 错题本表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS mistakes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -89,7 +91,7 @@ function initDatabase() {
   `);
 
   // 学习记录表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS study_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -104,7 +106,7 @@ function initDatabase() {
   `);
 
   // AI学习诊断报告表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS diagnosis_reports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -117,7 +119,7 @@ function initDatabase() {
   `);
 
   // AI出题记录表
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS quiz_sets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -133,7 +135,7 @@ function initDatabase() {
   `);
 
   // 向量检索表（RAG语义检索用）
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge_embeddings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -147,7 +149,7 @@ function initDatabase() {
   `);
 
   // 索引
-  db.exec(`
+  await db.exec(`
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
     CREATE INDEX IF NOT EXISTS idx_knowledge_user ON knowledge_points(user_id);
@@ -158,13 +160,29 @@ function initDatabase() {
   `);
 
   // 兼容旧表的字段迁移
-  try {
-    db.exec(`ALTER TABLE knowledge_points ADD COLUMN subject TEXT DEFAULT ''`);
-  } catch (e) { /* 字段已存在 */ }
-
-  try {
-    db.exec(`ALTER TABLE mistakes ADD COLUMN image_path TEXT DEFAULT ''`);
-  } catch (e) { /* 字段已存在 */ }
+  // 注意：SQLite 不支持 ADD COLUMN IF NOT EXISTS，PostgreSQL 支持。
+  //       因此这里先尝试直接 ALTER，失败则忽略（字段已存在）。
+  //       新建表时这两个字段已在 CREATE TABLE 里定义，此处仅为兼容旧库。
+  if (db.isPostgres) {
+    await db.exec(`ALTER TABLE knowledge_points ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT ''`);
+    await db.exec(`ALTER TABLE mistakes ADD COLUMN IF NOT EXISTS image_path TEXT DEFAULT ''`);
+  } else {
+    // SQLite：先查字段是否存在，不存在才加
+    const sqliteDb = require('better-sqlite3');
+    const raw = sqliteDb(process.env.DB_PATH || require('path').join(__dirname, 'study.db'));
+    try {
+      const kpCols = raw.prepare('PRAGMA table_info(knowledge_points)').all().map(c => c.name);
+      if (!kpCols.includes('subject')) {
+        raw.exec(`ALTER TABLE knowledge_points ADD COLUMN subject TEXT DEFAULT ''`);
+      }
+      const mkCols = raw.prepare('PRAGMA table_info(mistakes)').all().map(c => c.name);
+      if (!mkCols.includes('image_path')) {
+        raw.exec(`ALTER TABLE mistakes ADD COLUMN image_path TEXT DEFAULT ''`);
+      }
+    } finally {
+      raw.close();
+    }
+  }
 }
 
 module.exports = initDatabase;

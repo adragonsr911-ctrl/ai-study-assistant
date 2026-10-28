@@ -5,20 +5,25 @@ const { callDoubao } = require('../utils/doubao');
 const auth = require('../middleware/auth');
 
 // 自动建表
-db.exec(`
-  CREATE TABLE IF NOT EXISTS quiz_sets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    subject TEXT NOT NULL,
-    title TEXT,
-    questions_json TEXT NOT NULL,
-    user_answers_json TEXT,
-    score INTEGER DEFAULT 0,
-    total INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-`);
+// 数据库适配层为异步接口，故用立即执行异步函数包裹，保证模块加载时执行建表。
+(async () => {
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS quiz_sets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        title TEXT,
+        questions_json TEXT NOT NULL,
+        user_answers_json TEXT,
+        score INTEGER DEFAULT 0,
+        total INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
+  } catch (e) {}
+})();
 
 /**
  * POST /api/quiz/generate
@@ -39,7 +44,7 @@ router.post('/generate', auth, async (req, res) => {
     // 如果基于错题，检索该科目的错题作为上下文
     let mistakesContext = '';
     if (based_on_mistakes) {
-      const mistakes = db.prepare(`
+      const mistakes = await db.prepare(`
         SELECT question, your_answer, correct_answer, analysis, mastery_level
         FROM mistakes
         WHERE user_id = ? AND subject LIKE ?
@@ -118,7 +123,7 @@ ${mistakesContext ? `以下是该学生的错题情况，请针对这些薄弱�
  * 保存出题记录和作答结果
  * body: { subject, title, questions, user_answers, score, total }
  */
-router.post('/save', auth, (req, res) => {
+router.post('/save', auth, async (req, res) => {
   try {
     const { subject, title, questions, user_answers, score, total } = req.body;
     const userId = req.user.id;
@@ -127,7 +132,7 @@ router.post('/save', auth, (req, res) => {
       return res.status(400).json({ error: '参数不完整' });
     }
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO quiz_sets (user_id, subject, title, questions_json, user_answers_json, score, total)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
@@ -151,10 +156,10 @@ router.post('/save', auth, (req, res) => {
  * GET /api/quiz/list
  * 获取用户的出题记录列表
  */
-router.get('/list', auth, (req, res) => {
+router.get('/list', auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const list = db.prepare(`
+    const list = await db.prepare(`
       SELECT id, subject, title, score, total, created_at
       FROM quiz_sets
       WHERE user_id = ?
@@ -173,12 +178,12 @@ router.get('/list', auth, (req, res) => {
  * GET /api/quiz/:id
  * 获取单条出题记录详情
  */
-router.get('/:id', auth, (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
     const userId = req.user.id;
     const quizId = req.params.id;
 
-    const quiz = db.prepare(`
+    const quiz = await db.prepare(`
       SELECT * FROM quiz_sets WHERE id = ? AND user_id = ?
     `).get(quizId, userId);
 

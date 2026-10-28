@@ -22,20 +22,6 @@ const PORT = process.env.PORT || 3000;
 // 数据库连接与自动建表
 const db = require('./db');
 const initDatabase = require('./db/schema');
-initDatabase();
-console.log('✓ 数据库表结构检查完成');
-
-// 兼容旧数据库的字段迁移
-try {
-  db.exec(`ALTER TABLE knowledge_points ADD COLUMN subject TEXT DEFAULT ''`);
-} catch (e) {
-  // 列已存在，忽略
-}
-try {
-  db.exec(`ALTER TABLE mistakes ADD COLUMN image_path TEXT DEFAULT ''`);
-} catch (e) {
-  // 列已存在，忽略
-}
 
 // 中间件
 app.use(cors());
@@ -83,9 +69,27 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-  console.log('========================================');
-  console.log('  AI智能学习助手 已启动');
-  console.log('  访问地址: http://localhost:' + PORT);
-  console.log('========================================');
-});
+async function startServer() {
+  try {
+    // 数据库健康检查
+    await db.healthCheck();
+    console.log('✓ 数据库连接成功（' + db.dbType + '）');
+
+    // 自动建表
+    await initDatabase();
+    console.log('✓ 数据库表结构检查完成');
+  } catch (err) {
+    console.error('✗ 数据库初始化失败:', err.message);
+    console.error('  服务将继续启动，但数据库相关接口会报错');
+  }
+
+  app.listen(PORT, () => {
+    console.log('========================================');
+    console.log('  AI智能学习助手 已启动');
+    console.log('  访问地址: http://localhost:' + PORT);
+    console.log('  数据库类型: ' + db.dbType);
+    console.log('========================================');
+  });
+}
+
+startServer();

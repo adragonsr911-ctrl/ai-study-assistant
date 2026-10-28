@@ -34,10 +34,10 @@ function addDays(dateStr, days) {
  * 获取今日待复习错题
  * GET /api/mistake/reviews/due
  */
-router.get('/reviews/due', authMiddleware, (req, res) => {
+router.get('/reviews/due', authMiddleware, async (req, res) => {
   try {
     const today = todayStr();
-    const due = db.prepare(`
+    const due = await db.prepare(`
       SELECT * FROM mistakes
       WHERE user_id = ? AND next_review_at IS NOT NULL AND next_review_at <= ?
       ORDER BY next_review_at ASC, created_at ASC
@@ -55,21 +55,21 @@ router.get('/reviews/due', authMiddleware, (req, res) => {
  * GET /api/mistake
  * Query: subject (可选，按科目筛选)
  */
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { subject } = req.query;
     const today = todayStr();
     let mistakes;
 
     if (subject) {
-      mistakes = db.prepare(`
+      mistakes = await db.prepare(`
         SELECT id, subject, question, mastery_level, review_count, next_review_at, last_reviewed_at, created_at, image_path
         FROM mistakes
         WHERE user_id = ? AND subject = ?
         ORDER BY created_at DESC
       `).all(req.user.id, subject);
     } else {
-      mistakes = db.prepare(`
+      mistakes = await db.prepare(`
         SELECT id, subject, question, mastery_level, review_count, next_review_at, last_reviewed_at, created_at, image_path
         FROM mistakes
         WHERE user_id = ?
@@ -95,9 +95,9 @@ router.get('/', authMiddleware, (req, res) => {
  * 获取单道错题详情
  * GET /api/mistake/:id
  */
-router.get('/:id', authMiddleware, (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const mistake = db.prepare(
+    const mistake = await db.prepare(
       'SELECT * FROM mistakes WHERE id = ? AND user_id = ?'
     ).get(req.params.id, req.user.id);
 
@@ -190,7 +190,7 @@ router.post('/add', authMiddleware, async (req, res) => {
     const today = todayStr();
 
     // 保存到数据库
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO mistakes (user_id, subject, question, your_answer, correct_answer, analysis, similar_questions, next_review_at, image_path)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
@@ -206,7 +206,7 @@ router.post('/add', authMiddleware, async (req, res) => {
     );
 
     // 更新学习记录
-    updateStudyRecord(req.user.id, 'mistake_count', 1);
+    await updateStudyRecord(req.user.id, 'mistake_count', 1);
 
     res.status(201).json({
       mistake: {
@@ -228,14 +228,14 @@ router.post('/add', authMiddleware, async (req, res) => {
  * POST /api/mistake/:id/review
  * Body: { result }  result: 'again'(还没掌握) | 'hard'(有点印象) | 'good'(记住了)
  */
-router.post('/:id/review', authMiddleware, (req, res) => {
+router.post('/:id/review', authMiddleware, async (req, res) => {
   try {
     const { result } = req.body;
     if (!['again', 'hard', 'good'].includes(result)) {
       return res.status(400).json({ error: '复习结果必须是 again、hard 或 good' });
     }
 
-    const mistake = db.prepare(
+    const mistake = await db.prepare(
       'SELECT * FROM mistakes WHERE id = ? AND user_id = ?'
     ).get(req.params.id, req.user.id);
 
@@ -273,7 +273,7 @@ router.post('/:id/review', authMiddleware, (req, res) => {
       }
     }
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE mistakes
       SET mastery_level = ?, review_count = ?, next_review_at = ?, last_reviewed_at = ?
       WHERE id = ? AND user_id = ?
@@ -298,7 +298,7 @@ router.post('/:id/review', authMiddleware, (req, res) => {
  * PUT /api/mistake/:id/mastery
  * Body: { level }  level: 0=未掌握, 1=部分掌握, 2=已掌握
  */
-router.put('/:id/mastery', authMiddleware, (req, res) => {
+router.put('/:id/mastery', authMiddleware, async (req, res) => {
   try {
     const { level } = req.body;
     const masteryLevel = parseInt(level);
@@ -307,7 +307,7 @@ router.put('/:id/mastery', authMiddleware, (req, res) => {
       return res.status(400).json({ error: '掌握程度必须是0、1、2' });
     }
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       UPDATE mistakes SET mastery_level = ? WHERE id = ? AND user_id = ?
     `).run(masteryLevel, req.params.id, req.user.id);
 
@@ -326,9 +326,9 @@ router.put('/:id/mastery', authMiddleware, (req, res) => {
  * 删除错题
  * DELETE /api/mistake/:id
  */
-router.delete('/:id', authMiddleware, (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const result = db.prepare(
+    const result = await db.prepare(
       'DELETE FROM mistakes WHERE id = ? AND user_id = ?'
     ).run(req.params.id, req.user.id);
 

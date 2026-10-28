@@ -9,74 +9,74 @@ const router = express.Router();
 /**
  * 汇总用户的全部学习数据（供AI诊断与前端展示）
  */
-function collectUserData(userId) {
+async function collectUserData(userId) {
   // 用户信息
-  const user = db.prepare('SELECT username, nickname FROM users WHERE id = ?').get(userId);
+  const user = await db.prepare('SELECT username, nickname FROM users WHERE id = ?').get(userId);
 
   // 答疑：总提问数、对话数、最近的提问
-  const totalChats = db.prepare(`
+  const totalChats = (await db.prepare(`
     SELECT COUNT(*) AS count FROM messages m
     JOIN conversations c ON m.conversation_id = c.id
     WHERE c.user_id = ? AND m.role = 'user'
-  `).get(userId).count;
+  `).get(userId)).count;
 
-  const conversationCount = db.prepare(
+  const conversationCount = (await db.prepare(
     'SELECT COUNT(*) AS count FROM conversations WHERE user_id = ?'
-  ).get(userId).count;
+  ).get(userId)).count;
 
-  const recentQuestions = db.prepare(`
+  const recentQuestions = (await db.prepare(`
     SELECT m.content FROM messages m
     JOIN conversations c ON m.conversation_id = c.id
     WHERE c.user_id = ? AND m.role = 'user'
     ORDER BY m.created_at DESC LIMIT 10
-  `).all(userId).map(r => r.content);
+  `).all(userId)).map(r => r.content);
 
   // 知识点：总数、最近拆解的主题
-  const totalKnowledge = db.prepare(
+  const totalKnowledge = (await db.prepare(
     'SELECT COUNT(*) AS count FROM knowledge_points WHERE user_id = ?'
-  ).get(userId).count;
+  ).get(userId)).count;
 
-  const recentTopics = db.prepare(
+  const recentTopics = (await db.prepare(
     'SELECT topic FROM knowledge_points WHERE user_id = ? ORDER BY created_at DESC LIMIT 10'
-  ).all(userId).map(r => r.topic);
+  ).all(userId)).map(r => r.topic);
 
   // 错题：总数、各掌握程度数量、科目分布、薄弱错题明细
-  const totalMistakes = db.prepare(
+  const totalMistakes = (await db.prepare(
     'SELECT COUNT(*) AS count FROM mistakes WHERE user_id = ?'
-  ).get(userId).count;
+  ).get(userId)).count;
 
-  const masteryCount = db.prepare(
+  const masteryCount = await db.prepare(
     'SELECT mastery_level, COUNT(*) AS count FROM mistakes WHERE user_id = ? GROUP BY mastery_level'
   ).all(userId);
   const masteryMap = { 0: 0, 1: 0, 2: 0 };
   masteryCount.forEach(r => { masteryMap[r.mastery_level] = r.count; });
 
-  const subjectDistribution = db.prepare(`
+  const subjectDistribution = await db.prepare(`
     SELECT subject, COUNT(*) AS count FROM mistakes
     WHERE user_id = ? GROUP BY subject ORDER BY count DESC
   `).all(userId);
 
   // 薄弱错题（未掌握、部分掌握），作为诊断核心素材
-  const weakMistakes = db.prepare(`
+  const weakMistakes = await db.prepare(`
     SELECT subject, question, your_answer, correct_answer, mastery_level
     FROM mistakes WHERE user_id = ? AND mastery_level < 2
     ORDER BY created_at DESC LIMIT 15
   `).all(userId);
 
   // 学习计划
-  const totalPlans = db.prepare(
+  const totalPlans = (await db.prepare(
     'SELECT COUNT(*) AS count FROM study_plans WHERE user_id = ?'
-  ).get(userId).count;
+  ).get(userId)).count;
 
-  const plans = db.prepare(`
+  const plans = await db.prepare(`
     SELECT subject, exam_date, daily_hours FROM study_plans
     WHERE user_id = ? ORDER BY created_at DESC LIMIT 5
   `).all(userId);
 
   // 学习活跃度：学习天数、最近7天记录
-  const studyDays = db.prepare(
+  const studyDays = (await db.prepare(
     'SELECT COUNT(DISTINCT record_date) AS days FROM study_records WHERE user_id = ?'
-  ).get(userId).days;
+  ).get(userId)).days;
 
   const days = [];
   for (let i = 6; i >= 0; i--) {
@@ -85,7 +85,7 @@ function collectUserData(userId) {
     days.push(date.toISOString().split('T')[0]);
   }
   const placeholders = days.map(() => '?').join(',');
-  const recentRecords = db.prepare(`
+  const recentRecords = await db.prepare(`
     SELECT record_date, chat_count, knowledge_count, mistake_count
     FROM study_records WHERE user_id = ? AND record_date IN (${placeholders})
     ORDER BY record_date ASC
@@ -191,9 +191,9 @@ function buildDataPrompt(data, todayStr) {
  * 获取诊断报告列表
  * GET /api/diagnosis
  */
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const reports = db.prepare(`
+    const reports = await db.prepare(`
       SELECT id, title, created_at FROM diagnosis_reports
       WHERE user_id = ? ORDER BY created_at DESC
     `).all(req.user.id);
@@ -208,9 +208,9 @@ router.get('/', authMiddleware, (req, res) => {
  * 获取单个诊断报告详情
  * GET /api/diagnosis/:id
  */
-router.get('/:id', authMiddleware, (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const report = db.prepare(
+    const report = await db.prepare(
       'SELECT * FROM diagnosis_reports WHERE id = ? AND user_id = ?'
     ).get(req.params.id, req.user.id);
 
@@ -234,7 +234,7 @@ router.get('/:id', authMiddleware, (req, res) => {
 router.post('/generate', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
-    const data = collectUserData(userId);
+    const data = await collectUserData(userId);
     const todayStr = new Date().toISOString().split('T')[0];
 
     // 数据过少时给出提示，但仍允许生成（AI会说明数据不足）
@@ -264,7 +264,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
       generated_at: todayStr,
     };
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO diagnosis_reports (user_id, title, content, summary_json)
       VALUES (?, ?, ?, ?)
     `).run(userId, title, content, JSON.stringify(summary));
@@ -288,9 +288,9 @@ router.post('/generate', authMiddleware, async (req, res) => {
  * 删除诊断报告
  * DELETE /api/diagnosis/:id
  */
-router.delete('/:id', authMiddleware, (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const result = db.prepare(
+    const result = await db.prepare(
       'DELETE FROM diagnosis_reports WHERE id = ? AND user_id = ?'
     ).run(req.params.id, req.user.id);
 
