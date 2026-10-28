@@ -1,4 +1,6 @@
 // 学习记录工具函数
+// 注意：数据库层已改为异步（支持 Supabase），因此本函数为 async，
+//       调用方需要使用 await 或 .catch() 处理。
 const db = require('../db');
 
 /**
@@ -7,18 +9,18 @@ const db = require('../db');
  * @param {string} field - 要增加的字段：chat_count / knowledge_count / mistake_count / study_minutes
  * @param {number} amount - 增加的数量，默认1
  */
-function updateStudyRecord(userId, field, amount = 1) {
+async function updateStudyRecord(userId, field, amount = 1) {
   try {
     const today = new Date().toISOString().split('T')[0];
 
     // 检查今天是否已有记录
-    const existing = db.prepare(
+    const existing = await db.prepare(
       'SELECT id FROM study_records WHERE user_id = ? AND record_date = ?'
     ).get(userId, today);
 
     if (existing) {
       // 更新记录
-      db.prepare(
+      await db.prepare(
         `UPDATE study_records SET ${field} = ${field} + ? WHERE id = ?`
       ).run(amount, existing.id);
     } else {
@@ -33,7 +35,7 @@ function updateStudyRecord(userId, field, amount = 1) {
       };
       insertData[field] = amount;
 
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO study_records (user_id, record_date, chat_count, knowledge_count, mistake_count, study_minutes)
         VALUES (@user_id, @record_date, @chat_count, @knowledge_count, @mistake_count, @study_minutes)
       `).run(insertData);

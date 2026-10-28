@@ -26,12 +26,12 @@ function extractKeywords(query) {
 /**
  * 从源表加载所有学习数据（用于懒加载向量化）
  */
-function loadAllSourceData(userId) {
+async function loadAllSourceData(userId) {
   const allData = [];
 
   // 错题本
   try {
-    const mistakes = db.prepare(`
+    const mistakes = await db.prepare(`
       SELECT id, subject, question, analysis, correct_answer FROM mistakes WHERE user_id = ?
     `).all(userId);
     mistakes.forEach(m => {
@@ -45,7 +45,7 @@ function loadAllSourceData(userId) {
 
   // 知识点
   try {
-    const knowledge = db.prepare(`
+    const knowledge = await db.prepare(`
       SELECT id, topic, content FROM knowledge_points WHERE user_id = ?
     `).all(userId);
     knowledge.forEach(k => {
@@ -59,7 +59,7 @@ function loadAllSourceData(userId) {
 
   // 学习计划
   try {
-    const plans = db.prepare(`
+    const plans = await db.prepare(`
       SELECT id, subject, content FROM study_plans WHERE user_id = ?
     `).all(userId);
     plans.forEach(p => {
@@ -73,7 +73,7 @@ function loadAllSourceData(userId) {
 
   // 诊断报告
   try {
-    const diagnosis = db.prepare(`
+    const diagnosis = await db.prepare(`
       SELECT id, title, content FROM diagnosis_reports WHERE user_id = ?
     `).all(userId);
     diagnosis.forEach(d => {
@@ -94,16 +94,16 @@ function loadAllSourceData(userId) {
  */
 async function ensureEmbeddings(userId) {
   // 统计已有向量数量
-  const countRow = db.prepare('SELECT COUNT(*) as cnt FROM knowledge_embeddings WHERE user_id = ?').get(userId);
-  const existingCount = countRow ? countRow.cnt : 0;
+  const countRow = await db.prepare('SELECT COUNT(*) as cnt FROM knowledge_embeddings WHERE user_id = ?').get(userId);
+  const existingCount = countRow ? Number(countRow.cnt) : 0;
 
   // 加载所有源数据
-  const allData = loadAllSourceData(userId);
+  const allData = await loadAllSourceData(userId);
 
   // 找出还没有向量的数据
   const missing = [];
   for (const item of allData) {
-    const exists = db.prepare(
+    const exists = await db.prepare(
       'SELECT id FROM knowledge_embeddings WHERE user_id = ? AND source_type = ? AND source_id = ?'
     ).get(userId, item.source_type, item.source_id);
     if (!exists) {
@@ -121,7 +121,7 @@ async function ensureEmbeddings(userId) {
   for (const item of missing) {
     try {
       const vector = await getEmbedding(item.content_text);
-      db.prepare(`
+      await db.prepare(`
         INSERT OR IGNORE INTO knowledge_embeddings (user_id, source_type, source_id, content_text, vector_json)
         VALUES (?, ?, ?, ?, ?)
       `).run(userId, item.source_type, item.source_id, item.content_text, JSON.stringify(vector));
@@ -144,7 +144,7 @@ async function semanticRetrieval(userId, query) {
   const queryVector = await getEmbedding(query.substring(0, 500));
 
   // 3. 加载用户所有向量
-  const embeddings = db.prepare(`
+  const embeddings = await db.prepare(`
     SELECT source_type, source_id, content_text, vector_json
     FROM knowledge_embeddings
     WHERE user_id = ? AND vector_json IS NOT NULL
@@ -182,16 +182,16 @@ async function semanticRetrieval(userId, query) {
     if (item.score < 0.3) continue; // 相似度太低的跳过
 
     if (item.source_type === 'mistake') {
-      const detail = db.prepare('SELECT subject, question, your_answer, correct_answer, analysis, mastery_level FROM mistakes WHERE id = ?').get(item.source_id);
+      const detail = await db.prepare('SELECT subject, question, your_answer, correct_answer, analysis, mastery_level FROM mistakes WHERE id = ?').get(item.source_id);
       if (detail) context.mistakes.push({ ...detail, _score: item.score });
     } else if (item.source_type === 'knowledge') {
-      const detail = db.prepare('SELECT topic, content FROM knowledge_points WHERE id = ?').get(item.source_id);
+      const detail = await db.prepare('SELECT topic, content FROM knowledge_points WHERE id = ?').get(item.source_id);
       if (detail) context.knowledge.push({ ...detail, _score: item.score });
     } else if (item.source_type === 'plan') {
-      const detail = db.prepare('SELECT subject, exam_date, daily_hours, content FROM study_plans WHERE id = ?').get(item.source_id);
+      const detail = await db.prepare('SELECT subject, exam_date, daily_hours, content FROM study_plans WHERE id = ?').get(item.source_id);
       if (detail) context.plans.push({ ...detail, _score: item.score });
     } else if (item.source_type === 'diagnosis') {
-      const detail = db.prepare('SELECT title, content FROM diagnosis_reports WHERE id = ?').get(item.source_id);
+      const detail = await db.prepare('SELECT title, content FROM diagnosis_reports WHERE id = ?').get(item.source_id);
       if (detail) context.diagnosis.push({ ...detail, _score: item.score });
     }
   }
@@ -209,7 +209,7 @@ async function semanticRetrieval(userId, query) {
 /**
  * 关键词匹配检索（降级方案）
  */
-function keywordRetrieval(userId, query) {
+async function keywordRetrieval(userId, query) {
   const keywords = extractKeywords(query);
   const context = {
     mistakes: [],
@@ -233,7 +233,7 @@ function keywordRetrieval(userId, query) {
       sql += ' AND (' + conditions.join(' OR ') + ')';
     }
     sql += ' ORDER BY created_at DESC LIMIT 5';
-    context.mistakes = db.prepare(sql).all(...params);
+    context.mistakes = await db.prepare(sql).all(...params);
   } catch (e) {
     console.error('RAG关键词检索错题本错误:', e.message);
   }
@@ -251,7 +251,7 @@ function keywordRetrieval(userId, query) {
       sql += ' AND (' + conditions.join(' OR ') + ')';
     }
     sql += ' ORDER BY created_at DESC LIMIT 3';
-    context.knowledge = db.prepare(sql).all(...params);
+    context.knowledge = await db.prepare(sql).all(...params);
   } catch (e) {
     console.error('RAG关键词检索知识点错误:', e.message);
   }
@@ -269,14 +269,14 @@ function keywordRetrieval(userId, query) {
       sql += ' AND (' + conditions.join(' OR ') + ')';
     }
     sql += ' ORDER BY created_at DESC LIMIT 2';
-    context.plans = db.prepare(sql).all(...params);
+    context.plans = await db.prepare(sql).all(...params);
   } catch (e) {
     console.error('RAG关键词检索学习计划错误:', e.message);
   }
 
   // 4. 检索诊断报告（最新1份）
   try {
-    context.diagnosis = db.prepare(
+    context.diagnosis = await db.prepare(
       'SELECT title, content, created_at FROM diagnosis_reports WHERE user_id = ? ORDER BY created_at DESC LIMIT 1'
     ).all(userId);
   } catch (e) {
@@ -307,7 +307,7 @@ async function retrieveContext(userId, query) {
 
   // 降级为关键词匹配
   console.log('RAG检索模式：关键词匹配');
-  return keywordRetrieval(userId, query);
+  return await keywordRetrieval(userId, query);
 }
 
 /**

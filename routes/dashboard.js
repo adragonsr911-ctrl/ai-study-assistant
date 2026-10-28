@@ -9,43 +9,43 @@ const router = express.Router();
  * 获取学习数据概览
  * GET /api/dashboard/summary
  */
-router.get('/summary', authMiddleware, (req, res) => {
+router.get('/summary', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
 
     // 总对话次数
-    const totalChats = db.prepare(`
+    const totalChats = (await db.prepare(`
       SELECT COUNT(*) as count FROM messages m
       JOIN conversations c ON m.conversation_id = c.id
       WHERE c.user_id = ? AND m.role = 'user'
-    `).get(userId).count;
+    `).get(userId)).count;
 
     // 知识点总数
-    const totalKnowledge = db.prepare(
+    const totalKnowledge = (await db.prepare(
       'SELECT COUNT(*) as count FROM knowledge_points WHERE user_id = ?'
-    ).get(userId).count;
+    ).get(userId)).count;
 
     // 错题总数
-    const totalMistakes = db.prepare(
+    const totalMistakes = (await db.prepare(
       'SELECT COUNT(*) as count FROM mistakes WHERE user_id = ?'
-    ).get(userId).count;
+    ).get(userId)).count;
 
     // 已掌握错题数
-    const masteredMistakes = db.prepare(
+    const masteredMistakes = (await db.prepare(
       'SELECT COUNT(*) as count FROM mistakes WHERE user_id = ? AND mastery_level = 2'
-    ).get(userId).count;
+    ).get(userId)).count;
 
     // 学习计划数
-    const totalPlans = db.prepare(
+    const totalPlans = (await db.prepare(
       'SELECT COUNT(*) as count FROM study_plans WHERE user_id = ?'
-    ).get(userId).count;
+    ).get(userId)).count;
 
     // 连续学习天数
-    const studyDays = db.prepare(`
+    const studyDays = (await db.prepare(`
       SELECT COUNT(DISTINCT record_date) as days
       FROM study_records
       WHERE user_id = ?
-    `).get(userId).days;
+    `).get(userId)).days;
 
     res.json({
       summary: {
@@ -69,9 +69,9 @@ router.get('/summary', authMiddleware, (req, res) => {
  * 获取科目错题分布
  * GET /api/dashboard/subject-distribution
  */
-router.get('/subject-distribution', authMiddleware, (req, res) => {
+router.get('/subject-distribution', authMiddleware, async (req, res) => {
   try {
-    const distribution = db.prepare(`
+    const distribution = await db.prepare(`
       SELECT subject, COUNT(*) as count
       FROM mistakes
       WHERE user_id = ?
@@ -90,7 +90,7 @@ router.get('/subject-distribution', authMiddleware, (req, res) => {
  * 获取学习热力图数据（最近12周）
  * GET /api/dashboard/heatmap
  */
-router.get('/heatmap', authMiddleware, (req, res) => {
+router.get('/heatmap', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -105,7 +105,7 @@ router.get('/heatmap', authMiddleware, (req, res) => {
 
     // 查询这些天的学习记录
     const placeholders = days.map(() => '?').join(',');
-    const records = db.prepare(`
+    const records = await db.prepare(`
       SELECT record_date, study_minutes, chat_count, knowledge_count, mistake_count
       FROM study_records
       WHERE user_id = ? AND record_date IN (${placeholders})
@@ -150,12 +150,12 @@ router.get('/heatmap', authMiddleware, (req, res) => {
  * 获取知识点掌握雷达图数据
  * GET /api/dashboard/radar
  */
-router.get('/radar', authMiddleware, (req, res) => {
+router.get('/radar', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
 
     // 按科目统计错题数量和平均掌握程度
-    const subjectStats = db.prepare(`
+    const subjectStats = await db.prepare(`
       SELECT
         subject,
         COUNT(*) as total,
@@ -194,7 +194,7 @@ router.get('/radar', authMiddleware, (req, res) => {
  * 获取学习时长趋势（支持指定天数）
  * GET /api/dashboard/trend?days=30
  */
-router.get('/trend', authMiddleware, (req, res) => {
+router.get('/trend', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const days = Math.min(Math.max(parseInt(req.query.days) || 7, 7), 90);
@@ -209,7 +209,7 @@ router.get('/trend', authMiddleware, (req, res) => {
 
     // 查询这些天的学习记录
     const placeholders = dateList.map(() => '?').join(',');
-    const records = db.prepare(`
+    const records = await db.prepare(`
       SELECT record_date, chat_count, knowledge_count, mistake_count, study_minutes
       FROM study_records
       WHERE user_id = ? AND record_date IN (${placeholders})

@@ -13,7 +13,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'chuanzhibei_default_secret';
  * POST /api/auth/register
  * Body: { username, password, nickname }
  */
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { username, password, nickname, security_question, security_answer } = req.body;
 
@@ -32,7 +32,7 @@ router.post('/register', (req, res) => {
     }
 
     // 检查用户名是否已存在
-    const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+    const existingUser = await db.prepare('SELECT id FROM users WHERE username = ?').get(username);
     if (existingUser) {
       return res.status(400).json({ error: '用户名已被注册' });
     }
@@ -41,7 +41,7 @@ router.post('/register', (req, res) => {
     const hashedPassword = bcrypt.hashSync(password, 10);
 
     // 插入用户
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO users (username, password, nickname, security_question, security_answer)
       VALUES (?, ?, ?, ?, ?)
     `).run(username, hashedPassword, nickname || username, security_question, security_answer);
@@ -73,7 +73,7 @@ router.post('/register', (req, res) => {
  * POST /api/auth/login
  * Body: { username, password }
  */
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -82,7 +82,7 @@ router.post('/login', (req, res) => {
     }
 
     // 查询用户
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    const user = await db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (!user) {
       return res.status(401).json({ error: '用户名或密码错误' });
     }
@@ -120,9 +120,9 @@ router.post('/login', (req, res) => {
  * GET /api/auth/me
  * Header: Authorization: Bearer <token>
  */
-router.get('/me', authMiddleware, (req, res) => {
+router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = db.prepare('SELECT id, username, nickname, created_at FROM users WHERE id = ?')
+    const user = await db.prepare('SELECT id, username, nickname, created_at FROM users WHERE id = ?')
       .get(req.user.id);
 
     if (!user) {
@@ -140,13 +140,13 @@ router.get('/me', authMiddleware, (req, res) => {
  * 获取用户安全问题（忘记密码第一步）
  * GET /api/auth/security-question?username=xxx
  */
-router.get('/security-question', (req, res) => {
+router.get('/security-question', async (req, res) => {
   try {
     const { username } = req.query;
     if (!username) {
       return res.status(400).json({ error: '请输入用户名' });
     }
-    const user = db.prepare('SELECT security_question FROM users WHERE username = ?').get(username);
+    const user = await db.prepare('SELECT security_question FROM users WHERE username = ?').get(username);
     if (!user) {
       return res.status(404).json({ error: '用户不存在' });
     }
@@ -165,7 +165,7 @@ router.get('/security-question', (req, res) => {
  * POST /api/auth/reset-password
  * Body: { username, security_answer, new_password }
  */
-router.post('/reset-password', (req, res) => {
+router.post('/reset-password', async (req, res) => {
   try {
     const { username, security_answer, new_password } = req.body;
     if (!username || !security_answer || !new_password) {
@@ -174,7 +174,7 @@ router.post('/reset-password', (req, res) => {
     if (new_password.length < 6) {
       return res.status(400).json({ error: '新密码长度不能少于6位' });
     }
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    const user = await db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (!user) {
       return res.status(404).json({ error: '用户不存在' });
     }
@@ -185,7 +185,7 @@ router.post('/reset-password', (req, res) => {
       return res.status(401).json({ error: '安全答案不正确' });
     }
     const hashedPassword = bcrypt.hashSync(new_password, 10);
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, user.id);
+    await db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, user.id);
     res.json({ message: '密码重置成功，请使用新密码登录' });
   } catch (error) {
     console.error('重置密码错误:', error);

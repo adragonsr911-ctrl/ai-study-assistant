@@ -11,9 +11,9 @@ const router = express.Router();
  * 获取知识点列表
  * GET /api/knowledge
  */
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const knowledgeList = db.prepare(`
+    const knowledgeList = await db.prepare(`
       SELECT id, topic, subject, created_at
       FROM knowledge_points
       WHERE user_id = ?
@@ -31,11 +31,11 @@ router.get('/', authMiddleware, (req, res) => {
  * 获取单个知识点详情
  * GET /api/knowledge/:id
  */
-router.get('/:id', authMiddleware, (req, res, next) => {
+router.get('/:id', authMiddleware, async (req, res, next) => {
   // graph是特殊路由，跳过交给后面的/graph处理
   if (req.params.id === 'graph') return next();
   try {
-    const knowledge = db.prepare(
+    const knowledge = await db.prepare(
       'SELECT * FROM knowledge_points WHERE id = ? AND user_id = ?'
     ).get(req.params.id, req.user.id);
 
@@ -80,13 +80,13 @@ router.post('/generate', authMiddleware, async (req, res) => {
     }
 
     // 保存到数据库
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO knowledge_points (user_id, topic, content, subject)
       VALUES (?, ?, ?, ?)
     `).run(req.user.id, topic.trim(), content, (subject || '').trim());
 
     // 更新学习记录
-    updateStudyRecord(req.user.id, 'knowledge_count', 1);
+    await updateStudyRecord(req.user.id, 'knowledge_count', 1);
 
     res.status(201).json({
       knowledge: {
@@ -106,9 +106,9 @@ router.post('/generate', authMiddleware, async (req, res) => {
  * 删除知识点
  * DELETE /api/knowledge/:id
  */
-router.delete('/:id', authMiddleware, (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const result = db.prepare(
+    const result = await db.prepare(
       'DELETE FROM knowledge_points WHERE id = ? AND user_id = ?'
     ).run(req.params.id, req.user.id);
 
@@ -128,7 +128,7 @@ router.delete('/:id', authMiddleware, (req, res) => {
  * GET /api/knowledge/graph
  * 返回节点和边，用于前端SVG渲染知识图谱
  */
-router.get('/graph', authMiddleware, (req, res) => {
+router.get('/graph', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const nodes = [];
@@ -147,7 +147,7 @@ router.get('/graph', authMiddleware, (req, res) => {
     });
 
     // 从错题本提取科目
-    const subjects = db.prepare(`
+    const subjects = await db.prepare(`
       SELECT DISTINCT subject FROM mistakes WHERE user_id = ? AND subject IS NOT NULL AND subject != ''
       UNION
       SELECT DISTINCT subject FROM study_plans WHERE user_id = ? AND subject IS NOT NULL AND subject != ''
@@ -174,9 +174,11 @@ router.get('/graph', authMiddleware, (req, res) => {
 
     // 每个科目下的错题节点
     let mistakeCount = 0;
-    subjects.forEach((s, index) => {
+    // 注意：原为 subjects.forEach，因循环体内有异步数据库查询，
+    // 改成 for...of 以保证 await 生效（forEach 不会等待异步回调）
+    for (const [index, s] of subjects.entries()) {
       const subjectId = 'subject_' + index;
-      const mistakes = db.prepare(`
+      const mistakes = await db.prepare(`
         SELECT id, question, mastery_level FROM mistakes
         WHERE user_id = ? AND subject = ?
         ORDER BY created_at DESC
@@ -201,11 +203,11 @@ router.get('/graph', authMiddleware, (req, res) => {
         edges.push({ source: subjectId, target: nodeId });
         mistakeCount++;
       });
-    });
+    }
 
     // 知识点节点（按subject字段分组到对应科目）
     let knowledgeCount = 0;
-    const knowledgeList = db.prepare(`
+    const knowledgeList = await db.prepare(`
       SELECT id, topic, subject FROM knowledge_points
       WHERE user_id = ?
       ORDER BY created_at DESC
