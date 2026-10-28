@@ -78,7 +78,8 @@ AI智能学习助手是一款基于大语言模型、**RAG检索增强生成**�
 
 ### 后端
 - Node.js + Express
-- SQLite (better-sqlite3) — 单文件数据库，零配置部署
+- **数据库双模式**：本地开发用 SQLite（better-sqlite3，单文件零配置），生产部署用 PostgreSQL（Supabase 云端，数据持久不丢失）。通过 `DB_TYPE` 环境变量一键切换，业务代码无需改动
+- **数据库适配层**：自研 `db/adapter.js`，自动完成 SQL 方言转换（占位符 `?`→`$1`、`AUTOINCREMENT`→`BIGSERIAL`、`INSERT OR IGNORE`→`ON CONFLICT` 等），89 处数据库调用统一封装
 - JWT 身份认证 + bcryptjs 密码加密
 - multer — 文件上传（错题图片）
 - 忘记密码（安全问题验证）
@@ -134,14 +135,61 @@ npm start
 打开浏览器访问：http://localhost:3000
 
 ### 测试账号
-- 用户名：`testuser`，密码：`123456`（含示例数据）
+- 用户名：`testuser`，密码：`123456`
+- 用户名：`111`，密码：`123456`（张三，含完整示例数据：6道错题、7个会话、诊断报告等）
 - 或自行注册新账号
+
+## 数据库配置（两种模式）
+
+项目支持两种数据库，通过 `DB_TYPE` 环境变量切换，**业务代码无需任何改动**。
+
+### 模式一：SQLite（本地开发，默认）
+
+```bash
+DB_TYPE=sqlite
+# 数据存在 db/study.db 文件里，零配置
+```
+
+适合本地开发和调试，不需要网络，速度最快。
+
+### 模式二：PostgreSQL（生产部署，数据持久）
+
+```bash
+DB_TYPE=postgres
+DATABASE_URL=postgresql://postgres.项目标识:密码@aws-0-区域.pooler.supabase.com:5432/postgres
+```
+
+适合线上部署。以 Supabase 为例：
+1. 注册 https://supabase.com 并创建项目（区域建议选 Singapore）
+2. 项目后台 → 连接 → **会话池化器**（Session pooler），复制连接串
+3. 初始化表结构：`npm run init-db`
+4. 如需导入本地数据：`npm run migrate-data`
+
+### 为什么要支持 PostgreSQL
+
+Render 免费层使用**临时文件系统**，服务每次重新部署、重启或休眠（15分钟无访问）时，本地 SQLite 数据库文件都会被清空，用户数据全部丢失。接入云端 PostgreSQL 后，数据存在 Supabase 上，与 Render 实例生命周期无关，彻底解决数据丢失问题。
+
+### 数据库适配层原理
+
+`db/adapter.js` 让业务代码继续使用 `db.prepare(sql).get()/.all()/.run()` 的写法，内部自动处理：
+
+| SQLite 写法 | 自动转换为 PostgreSQL |
+|---|---|
+| `?` 占位符 | `$1, $2, ...` |
+| `@name` 具名参数 | `$n` + 参数重排 |
+| `INTEGER PRIMARY KEY AUTOINCREMENT` | `BIGSERIAL PRIMARY KEY` |
+| `INSERT OR IGNORE` | `INSERT ... ON CONFLICT DO NOTHING` |
+| `DATETIME` / `REAL` | `TIMESTAMP` / `DOUBLE PRECISION` |
+| `.run()` 返回的 `lastInsertRowid` | 自动追加 `RETURNING id` 后映射 |
 
 ## 环境变量说明
 
 | 变量名 | 说明 | 示例 |
 |---|---|---|
 | PORT | 服务端口 | 3000 |
+| DB_TYPE | 数据库类型，`sqlite` 或 `postgres` | postgres |
+| DATABASE_URL | PostgreSQL 连接串（仅 postgres 模式需要） | postgresql://postgres.xxx:密码@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres |
+| DB_PATH | SQLite 文件路径（仅 sqlite 模式，可选） | /data/study.db |
 | DOUBAO_API_KEY | 火山方舟API密钥 | ark-xxxxxxxx |
 | DOUBAO_MODEL | 推理接入点ID（DeepSeek-V4-Flash） | ep-xxxxxxxx |
 | DOUBAO_BASE_URL | API请求地址 | https://ark.cn-beijing.volces.com/api/v3/chat/completions |
@@ -176,9 +224,13 @@ ai-study-assistant/
 │   │   └── app.js          # 主应用逻辑（路由/状态/事件/主题切换）
 │   └── vendor/             # 第三方库本地化（字体/marked/highlight）
 ├── db/
-│   ├── index.js            # 数据库连接（WAL模式）
-│   ├── init.js             # 数据库初始化脚本（11张表）
-│   └── study.db            # SQLite数据库文件
+│   ├── adapter.js          # 数据库适配层（SQLite/PostgreSQL 双模式 + SQL 方言自动转换）
+│   ├── index.js            # 数据库入口（统一暴露 prepare/exec 接口）
+│   ├── init.js             # 数据库初始化脚本（10张表，支持两种数据库）
+│   ├── schema.js           # 自动建表（服务器启动时执行）
+│   └── study.db            # SQLite数据库文件（仅本地开发用，已gitignore）
+├── scripts/
+│   └── migrate-data.js     # 数据迁移脚本（SQLite -> PostgreSQL）
 ├── routes/
 │   ├── auth.js             # 用户认证接口（注册/登录/忘记密码）
 │   ├── chat.js             # AI对话接口（含RAG语义检索）
