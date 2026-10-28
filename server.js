@@ -19,19 +19,20 @@ const uploadRoutes = require('./routes/upload');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 数据库迁移：确保知识点表有subject字段
+// 数据库连接与自动建表
 const db = require('./db');
+const initDatabase = require('./db/schema');
+initDatabase();
+console.log('✓ 数据库表结构检查完成');
+
+// 兼容旧数据库的字段迁移
 try {
   db.exec(`ALTER TABLE knowledge_points ADD COLUMN subject TEXT DEFAULT ''`);
-  console.log('✓ 数据库迁移：knowledge_points.subject 字段已添加');
 } catch (e) {
   // 列已存在，忽略
 }
-
-// 数据库迁移：确保错题表有image_path字段
 try {
   db.exec(`ALTER TABLE mistakes ADD COLUMN image_path TEXT DEFAULT ''`);
-  console.log('✓ 数据库迁移：mistakes.image_path 字段已添加');
 } catch (e) {
   // 列已存在，忽略
 }
@@ -44,8 +45,15 @@ app.use(express.urlencoded({ extended: true }));
 // 静态文件服务（前端页面）
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 上传文件目录：优先使用环境变量UPLOAD_DIR（Railway持久化卷），否则用本地路径
+const fs = require('fs');
+const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // 静态文件服务（上传的图片）
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadDir));
 
 // API路由
 app.use('/api/auth', authRoutes);
