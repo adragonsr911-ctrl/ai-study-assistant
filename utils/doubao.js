@@ -24,6 +24,18 @@ async function callDoubao(messages, options = {}) {
     top_p: options.top_p ?? 0.9,
   };
 
+  // 思考型模型（如 DeepSeek-V4.1）支持通过 thinking 参数控制深度思考。
+  //
+  // 背景：DeepSeek-V4.1-Flash 默认开启深度思考，会先把 token 全部用于
+  // reasoning_content（推理过程），导致 content（正文）为空、finish_reason=length。
+  // 学习类任务（答疑/拆解/计划/分析）需要的是完整正文，不需要推理过程，
+  // 因此默认关闭思考；如确有需要，可传 options.thinking = true 开启。
+  if (options.thinking === true) {
+    requestBody.thinking = { type: 'enabled' };
+  } else {
+    requestBody.thinking = { type: 'disabled' };
+  }
+
   try {
     const response = await fetch(DOUBAO_BASE_URL, {
       method: 'POST',
@@ -40,7 +52,38 @@ async function callDoubao(messages, options = {}) {
     }
 
     const data = await response.json();
-    return data.choices[0].message.content;
+    const choice = data.choices && data.choices[0];
+    const message = choice && choice.message;
+    const content = (message && message.content) || '';
+
+    // 防御：思考型模型可能把 token 全用在 reasoning_content 上，
+    // 导致 content 为空但 finish_reason=length。此时重试一次（关闭思考）。
+    if (!content.trim() && choice && choice.finish_reason === 'length') {
+      console.warn('模型输出被思考过程占满，关闭深度思考后重试一次');
+      const retryBody = { ...requestBody, thinking: { type: 'disabled' } };
+      const retryResp = await fetch(DOUBAO_BASE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DOUBAO_API_KEY}`,
+        },
+        body: JSON.stringify(retryBody),
+      });
+      if (retryResp.ok) {
+        const retryData = await retryResp.json();
+        const retryContent = retryData.choices?.[0]?.message?.content || '';
+        if (retryContent.trim()) {
+          return retryContent;
+        }
+      }
+      throw new Error('模型未返回有效内容（输出长度不足），请稍后重试');
+    }
+
+    if (!content.trim()) {
+      throw new Error('模型未返回内容');
+    }
+
+    return content;
   } catch (error) {
     console.error('豆包API调用错误:', error.message);
     throw error;
