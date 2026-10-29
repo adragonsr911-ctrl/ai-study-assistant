@@ -74,6 +74,24 @@ app.get('/api/health/storage', async (req, res) => {
   res.json(info);
 });
 
+// AI 模型配置检查接口
+app.get('/api/health/ai', (req, res) => {
+  const chatModel = process.env.DOUBAO_MODEL || '';
+  const visionModel = process.env.VISION_MODEL || '';
+  const embeddingModel = process.env.EMBEDDING_MODEL || '';
+
+  res.json({
+    chatModel: chatModel || '(未配置)',
+    visionModel: visionModel || '(未配置，将回退到 DOUBAO_MODEL)',
+    visionModelEffective: visionModel || chatModel || '(未配置)',
+    visionConfigured: !!visionModel,
+    embeddingModel: embeddingModel || '(未配置)',
+    hint: visionModel
+      ? '视觉识别已单独配置，拍照录题可用'
+      : '视觉识别未单独配置。若 DOUBAO_MODEL 为 DeepSeek 系列（纯文本），拍照录题将失败，请配置 VISION_MODEL',
+  });
+});
+
 // 404处理
 app.use((req, res) => {
   res.status(404).json({ error: '接口不存在' });

@@ -3,9 +3,17 @@ const path = require('path');
 const storage = require('./storage');
 
 const ARK_API_KEY = process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY;
-// 优先用VISION_MODEL，没有就用DOUBAO_MODEL（DeepSeek-V4-Flash正式版，支持多模态）
+// 视觉识别必须使用支持图片输入的多模态模型
+// 注意：DeepSeek 系列是纯文本模型，不能用于图片识别
+// 推荐使用 Doubao-Seed-Evolving（多模态，支持视觉理解）
 const VISION_MODEL = process.env.VISION_MODEL || process.env.DOUBAO_MODEL;
 const ARK_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+
+// 记录启动时的视觉模型配置，便于排查
+console.log('视觉识别模型: ' + (process.env.VISION_MODEL ? VISION_MODEL + '（VISION_MODEL）' : VISION_MODEL + '（回退到 DOUBAO_MODEL）'));
+if (!process.env.VISION_MODEL) {
+  console.warn('⚠ 未配置 VISION_MODEL，将使用 DOUBAO_MODEL。若该模型不支持图片输入，拍照识别会失败。');
+}
 
 /**
  * 识别错题图片，返回结构化信息
