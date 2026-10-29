@@ -74,6 +74,20 @@ function mimeOf(filename) {
 }
 
 /**
+ * 构造 Supabase 请求头，同时兼容新旧两种密钥体系：
+ *   旧版（JWT）：eyJ... 开头，用 Authorization: Bearer <key>
+ *   新版（Secret）：sb_secret_... 开头，用 apikey: <key> 和 Authorization: Bearer <key>
+ * 新版密钥同时带 apikey 头最稳妥，旧版带 apikey 也兼容。
+ */
+function authHeaders(extra = {}) {
+  return {
+    apikey: SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+    ...extra,
+  };
+}
+
+/**
  * 上传文件
  * @param {Buffer} buffer 文件内容
  * @param {string} originalName 原始文件名（用于取扩展名）
@@ -91,11 +105,10 @@ async function uploadFile(buffer, originalName) {
     const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${filename}`;
     const resp = await fetch(uploadUrl, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      headers: authHeaders({
         'Content-Type': mimeOf(filename),
         'x-upsert': 'true',
-      },
+      }),
       body: buffer,
     });
 
@@ -152,9 +165,7 @@ async function readFile(filenameOrPath) {
       throw new Error('Supabase 存储未配置');
     }
     const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${filename}`;
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
-    });
+    const resp = await fetch(url, { headers: authHeaders() });
     if (!resp.ok) {
       throw new Error(`从 Supabase 读取失败: ${resp.status}`);
     }
@@ -185,7 +196,7 @@ async function exists(filenameOrPath) {
     try {
       const resp = await fetch(
         `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${filename}`,
-        { method: 'HEAD', headers: { Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
+        { method: 'HEAD', headers: authHeaders() }
       );
       return resp.ok;
     } catch (e) {
@@ -209,7 +220,7 @@ async function deleteFile(filenameOrPath) {
   if (USE_SUPABASE) {
     await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${filename}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+      headers: authHeaders(),
     });
     return;
   }

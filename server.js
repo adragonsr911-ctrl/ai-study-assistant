@@ -57,6 +57,23 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 存储健康检查接口（用于排查部署配置问题，不泄露密钥内容）
+app.get('/api/health/storage', async (req, res) => {
+  const storage = require('./utils/storage');
+  const key = process.env.SUPABASE_SERVICE_KEY || '';
+  const info = {
+    storageType: storage.storageType,
+    bucket: storage.bucket,
+    supabaseUrl: (process.env.SUPABASE_URL || '').replace(/\/$/, '') || '(未配置，将从DATABASE_URL推导)',
+    keyConfigured: !!key,
+    keyLength: key.length,
+    keyPrefix: key ? key.substring(0, 10) + '...' : '(空)',
+    keyFormat: key.startsWith('sb_secret_') ? '新版secret密钥' : (key.startsWith('eyJ') ? '旧版JWT密钥' : '未知格式'),
+    dbType: db.dbType,
+  };
+  res.json(info);
+});
+
 // 404处理
 app.use((req, res) => {
   res.status(404).json({ error: '接口不存在' });
