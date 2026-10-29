@@ -81,7 +81,8 @@ AI智能学习助手是一款基于大语言模型、**RAG检索增强生成**�
 - **数据库双模式**：本地开发用 SQLite（better-sqlite3，单文件零配置），生产部署用 PostgreSQL（Supabase 云端，数据持久不丢失）。通过 `DB_TYPE` 环境变量一键切换，业务代码无需改动
 - **数据库适配层**：自研 `db/adapter.js`，自动完成 SQL 方言转换（占位符 `?`→`$1`、`AUTOINCREMENT`→`BIGSERIAL`、`INSERT OR IGNORE`→`ON CONFLICT` 等），89 处数据库调用统一封装
 - JWT 身份认证 + bcryptjs 密码加密
-- multer — 文件上传（错题图片）
+- multer — 文件上传（错题图片），配合存储适配层支持本地磁盘与 Supabase Storage 双模式
+- **图片存储双模式**：本地开发存磁盘，生产部署存 Supabase Storage 云端，通过 `STORAGE_TYPE` 环境变量切换
 - 忘记密码（安全问题验证）
 
 ### 前端
@@ -182,6 +183,45 @@ Render 免费层使用**临时文件系统**，服务每次重新部署、重启
 | `DATETIME` / `REAL` | `TIMESTAMP` / `DOUBLE PRECISION` |
 | `.run()` 返回的 `lastInsertRowid` | 自动追加 `RETURNING id` 后映射 |
 
+## 图片存储配置（两种模式）
+
+错题图片同样支持两种存储，通过 `STORAGE_TYPE` 环境变量切换。
+
+### 模式一：本地磁盘（本地开发，默认）
+
+```bash
+STORAGE_TYPE=local
+# 图片存在 uploads/ 目录
+```
+
+### 模式二：Supabase Storage（生产部署，图片持久）
+
+```bash
+STORAGE_TYPE=supabase
+SUPABASE_URL=https://项目标识.supabase.co
+SUPABASE_SERVICE_KEY=服务端密钥
+SUPABASE_BUCKET=mistake-images
+```
+
+配置步骤：
+1. Supabase 后台 → 存储 → 新建存储桶，名称 `mistake-images`，**勾选公开存储桶**
+2. 项目设置 → API 密钥 → 复制**秘密密钥**（新版以 `sb_secret_` 开头）
+3. 填入 Render 环境变量
+
+> **密钥格式说明**：Supabase 2026 年起推行新版密钥体系（`sb_publishable_` / `sb_secret_`），新项目不再接受旧版 JWT 密钥（`eyJ...`）访问 Storage API。本项目代码同时兼容两种格式，会同时发送 `apikey` 和 `Authorization` 请求头。
+
+### 为什么图片也要上云
+
+与数据库同理：Render 免费层的本地磁盘是临时的，图片存在 `uploads/` 目录同样会在休眠/重启时丢失。改用 Supabase Storage 后，图片地址变为云端 URL，与 Render 实例生命周期无关。
+
+### 存储层原理
+
+`utils/storage.js` 封装了上传、读取、存在检查、删除四个操作，业务代码无需关心底层是本地磁盘还是云端：
+
+- 上传路由使用**内存缓冲**接收文件，再由存储层决定落盘或上传云端
+- `vision.js` 通过存储层读取图片内容，因此 AI 识别在两种模式下都能工作
+- 数据库统一存**纯文件名**，前端 `resolveImageUrl()` 按存储模式解析为完整地址
+
 ## 环境变量说明
 
 | 变量名 | 说明 | 示例 |
@@ -190,6 +230,10 @@ Render 免费层使用**临时文件系统**，服务每次重新部署、重启
 | DB_TYPE | 数据库类型，`sqlite` 或 `postgres` | postgres |
 | DATABASE_URL | PostgreSQL 连接串（仅 postgres 模式需要） | postgresql://postgres.xxx:密码@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres |
 | DB_PATH | SQLite 文件路径（仅 sqlite 模式，可选） | /data/study.db |
+| STORAGE_TYPE | 图片存储类型，`local` 或 `supabase` | supabase |
+| SUPABASE_URL | Supabase 项目地址（仅 supabase 模式） | https://项目标识.supabase.co |
+| SUPABASE_SERVICE_KEY | Supabase 秘密密钥（服务端专用，仅 supabase 模式） | sb_secret_xxxxxxxx |
+| SUPABASE_BUCKET | 存储桶名称，默认 mistake-images | mistake-images |
 | DOUBAO_API_KEY | 火山方舟API密钥 | ark-xxxxxxxx |
 | DOUBAO_MODEL | 推理接入点ID（DeepSeek-V4-Flash） | ep-xxxxxxxx |
 | DOUBAO_BASE_URL | API请求地址 | https://ark.cn-beijing.volces.com/api/v3/chat/completions |
@@ -247,8 +291,9 @@ ai-study-assistant/
 │   ├── vision.js           # 多模态视觉识别封装
 │   ├── embedding.js        # 向量嵌入封装
 │   ├── rag.js              # RAG检索增强生成（语义检索+关键词降级）
+│   ├── storage.js          # 图片存储适配层（本地磁盘 / Supabase Storage 双模式）
 │   └── studyRecord.js      # 学习记录工具
-├── uploads/                # 用户上传的错题图片
+├── uploads/                # 用户上传的错题图片（仅 local 模式，已gitignore）
 ├── .env.example            # 环境变量模板（脱敏）
 ├── .gitignore              # Git忽略配置
 ├── server.js               # 服务器入口
