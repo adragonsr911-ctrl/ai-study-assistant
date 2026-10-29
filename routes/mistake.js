@@ -124,21 +124,15 @@ router.post('/recognize', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: '缺少图片路径' });
     }
 
-    // 构造本地路径（支持传文件名或完整路径）
-    let localPath;
-    if (image_path.startsWith('/uploads/')) {
-      localPath = path.join(__dirname, '..', 'uploads', path.basename(image_path));
-    } else {
-      localPath = path.join(__dirname, '..', 'uploads', image_path);
-    }
-
-    const fs = require('fs');
-    if (!fs.existsSync(localPath)) {
+    // 通过存储层判断图片是否存在（兼容本地磁盘与 Supabase Storage）
+    const storage = require('../utils/storage');
+    const found = await storage.exists(image_path);
+    if (!found) {
       return res.status(404).json({ error: '图片文件不存在' });
     }
 
-    // 调用视觉模型识别
-    const result = await recognizeMistakeImage(localPath);
+    // 调用视觉模型识别（vision.js 内部会通过存储层读取图片内容）
+    const result = await recognizeMistakeImage(image_path);
 
     res.json({ success: true, data: result });
   } catch (error) {

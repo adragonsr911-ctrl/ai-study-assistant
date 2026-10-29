@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const storage = require('./storage');
 
 const ARK_API_KEY = process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY;
 // 优先用VISION_MODEL，没有就用DOUBAO_MODEL（DeepSeek-V4-Flash正式版，支持多模态）
@@ -8,17 +9,21 @@ const ARK_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 /**
  * 识别错题图片，返回结构化信息
- * @param {string} imagePath - 图片本地路径
+ * @param {string} imageRef - 图片引用（文件名 / 本地路径 / Supabase URL 均可）
  * @returns {Promise<{subject: string, question: string, your_answer: string, correct_answer: string}>}
  */
-async function recognizeMistakeImage(imagePath) {
+async function recognizeMistakeImage(imageRef) {
   if (!ARK_API_KEY) {
     throw new Error('未配置ARK_API_KEY');
   }
 
-  // 读取图片并转base64
-  const imageBuffer = fs.readFileSync(imagePath);
-  const ext = path.extname(imagePath).toLowerCase().replace('.', '');
+  // 通过存储层读取图片内容，兼容本地磁盘与 Supabase Storage
+  const imageBuffer = await storage.readFile(imageRef);
+
+  // 从引用里推断扩展名
+  const cleanRef = String(imageRef).split('?')[0];
+  let ext = path.extname(cleanRef).toLowerCase().replace('.', '');
+  if (!ext) ext = 'jpg';
   const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
   const base64Image = imageBuffer.toString('base64');
   const dataUrl = `data:${mimeType};base64,${base64Image}`;

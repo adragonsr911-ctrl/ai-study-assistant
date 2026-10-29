@@ -41,6 +41,21 @@ const AI = {
   reviewQueue: [],
   reviewIndex: 0,
 
+  /**
+   * 解析图片地址，兼容三种存储形态：
+   *   1. 纯文件名（本地存储旧数据）        -> /uploads/文件名
+   *   2. 以 /uploads/ 开头的路径          -> 原样使用
+   *   3. 完整 URL（Supabase Storage 云端） -> 原样使用
+   */
+  resolveImageUrl(imagePath) {
+    if (!imagePath) return '';
+    const p = String(imagePath).trim();
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    if (p.startsWith('/uploads/')) return p;
+    if (p.startsWith('/')) return p;
+    return '/uploads/' + p;
+  },
+
   // ==================== AI对话功能 ====================
 
   // 加载对话列表
@@ -660,7 +675,7 @@ const AI = {
           <span class="subject-tag">${this.escapeHtml(m.subject)}</span>
           <span class="mastery-badge level-${m.mastery_level}" style="margin-left:8px;">${masteryLabels[m.mastery_level]}</span>
         </div>
-        ${m.image_path ? `<div class="mistake-detail-image"><img src="/uploads/${m.image_path}" alt="错题图片"></div>` : ''}
+        ${m.image_path ? `<div class="mistake-detail-image"><img src="${this.resolveImageUrl(m.image_path)}" alt="错题图片"></div>` : ''}
         <div style="margin-bottom:16px;">
           <h4 style="margin-bottom:8px;color:var(--text-primary);">题目</h4>
           <p style="background:var(--surface);padding:12px;border-radius:8px;white-space:pre-wrap;">${this.escapeHtml(m.question)}</p>
