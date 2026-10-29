@@ -779,6 +779,8 @@ const AI = {
   // 重置错题图片上传状态
   resetMistakeImage() {
     this.currentMistakeImage = '';
+    this.isUploadingMistakeImage = false;
+    this.setRecognizeButtonState('idle');
     document.getElementById('mistake-image-input').value = '';
     document.getElementById('mistake-upload-placeholder').classList.remove('hidden');
     document.getElementById('mistake-upload-preview').classList.add('hidden');
@@ -808,48 +810,108 @@ const AI = {
     reader.readAsDataURL(file);
 
     // 上传到服务器
+    // 注意：预览图由 FileReader 本地立即渲染，但上传是异步的。
+    // 上传期间必须锁定「AI识别题目」按钮，否则用户看到图片后立刻点击，
+    // currentMistakeImage 尚未赋值，会误提示「请先上传错题图片」。
+    this.isUploadingMistakeImage = true;
+    this.setRecognizeButtonState('uploading');
+
     try {
       const result = await API.mistake.uploadImage(file);
       this.currentMistakeImage = result.filename;
+      this.setRecognizeButtonState('ready');
       showToast('图片上传成功，点击"AI识别题目"自动填充', 'success');
     } catch (error) {
       showToast('图片上传失败：' + error.message, 'error');
       this.resetMistakeImage();
+    } finally {
+      this.isUploadingMistakeImage = false;
+    }
+  },
+
+  /**
+   * 设置「AI识别题目」按钮状态
+   * @param {string} state - uploading（上传中，禁用）| ready（可用）| idle（重置）
+   */
+  setRecognizeButtonState(state) {
+    const btn = document.getElementById('btn-recognize-image');
+    if (!btn) return;
+    if (state === 'uploading') {
+      btn.disabled = true;
+      btn.textContent = '图片上传中…';
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'AI识别题目';
     }
   },
 
   // AI识别错题图片
   async recognizeMistakeImage() {
+    // 上传尚未完成时给出友好提示，而不是误报「请先上传」
+    if (this.isUploadingMistakeImage) {
+      showToast('图片正在上传，请稍等片刻…', 'info');
+      return;
+    }
     if (!this.currentMistakeImage) {
       showToast('请先上传错题图片', 'error');
       return;
     }
 
-    document.getElementById('mistake-recognize-status').classList.remove('hidden');
+    const statusEl = document.getElementById('mistake-recognize-status');
+    const btn = document.getElementById('btn-recognize-image');
+    statusEl.classList.remove('hidden');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'AI 识别中…';
+    }
 
     try {
       const result = await API.mistake.recognize(this.currentMistakeImage);
       const data = result.data;
 
-      // 自动填充表单
+      // 后端会返回 recognized 标记：只有识别出题目内容才算成功。
+      // 不能仅凭字段非空判断——识别失败时后端不再兜底填充默认值。
+      if (data.recognized === false || !data.question) {
+        showToast('未能识别出题目内容。请确认照片清晰、光线充足后重试，或手动填写', 'error');
+        return;
+      }
+
+      // 自动填充表单，并记录实际填了哪些字段
+      const filled = [];
       if (data.subject) {
         document.getElementById('mistake-subject').value = data.subject;
+        filled.push('科目');
       }
-      if (data.question) {
-        document.getElementById('mistake-question').value = data.question;
-      }
+      document.getElementById('mistake-question').value = data.question;
+      filled.push('题目');
       if (data.your_answer) {
         document.getElementById('mistake-your-answer').value = data.your_answer;
+        filled.push('你的答案');
       }
       if (data.correct_answer) {
         document.getElementById('mistake-correct-answer').value = data.correct_answer;
+        filled.push('正确答案');
       }
 
-      showToast('识别完成，请核对后提交', 'success');
+      const missing = ['科目', '题目', '你的答案', '正确答案'].filter(f => !filled.includes(f));
+      if (missing.length > 0) {
+        showToast('识别完成，已填充「' + filled.join('、') + '」，' + missing.join('、') + '请手动补充', 'success');
+      } else {
+        showToast('识别完成，请核对后提交', 'success');
+      }
     } catch (error) {
-      showToast('识别失败：' + error.message, 'error');
+      const msg = String(error.message || '');
+      if (/超时|timeout|abort|aborted/i.test(msg)) {
+        showToast('识别超时，请重试或换一张更清晰的照片', 'error');
+      } else {
+        showToast('识别失败：' + msg, 'error');
+      }
     } finally {
-      document.getElementById('mistake-recognize-status').classList.add('hidden');
+      statusEl.classList.add('hidden');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'AI识别题目';
+      }
     }
   },
 

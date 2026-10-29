@@ -49,7 +49,10 @@ async function recognizeMistakeImage(imageRef) {
 1. 只返回JSON，不要有其他文字
 2. 题目内容要完整，包括所有条件和问题
 3. 如果是选择题，把所有选项都包含在question里
-4. 如果图片中没有明确的答案标注，对应字段填空字符串`;
+4. 如果图片中没有明确的答案标注，对应字段填空字符串
+5. 图片可能是手机拍照的手写作业，字迹可能潦草、纸张可能有阴影或倾斜，请尽力辨认
+6. 只要能看到题目内容就必须输出到 question 字段，不要因为没有答案标注就留空
+7. 如果确实完全看不到任何题目文字，question 才填空字符串`;
 
   const response = await fetch(ARK_URL, {
     method: 'POST',
@@ -94,11 +97,23 @@ async function recognizeMistakeImage(imageRef) {
     throw new Error('视觉模型返回格式解析失败: ' + content.substring(0, 200));
   }
 
+  // 归一化字段并判断是否真正识别到内容。
+  // 关键：不能给 subject 兜底成「其他」就当作识别成功——
+  // 模型识别失败时通常会返回空字段，此前兜底默认值会让前端误判为成功。
+  const subject = String(result.subject || '').trim();
+  const question = String(result.question || '').trim();
+  const yourAnswer = String(result.your_answer || '').trim();
+  const correctAnswer = String(result.correct_answer || '').trim();
+
+  // 只有识别出题目内容才算成功；题目是错题记录的核心字段
+  const recognized = question.length > 0;
+
   return {
-    subject: result.subject || '其他',
-    question: result.question || '',
-    your_answer: result.your_answer || '',
-    correct_answer: result.correct_answer || ''
+    subject: subject || (recognized ? '其他' : ''),
+    question,
+    your_answer: yourAnswer,
+    correct_answer: correctAnswer,
+    recognized,
   };
 }
 
