@@ -218,16 +218,24 @@ function normalizeRow(row) {
   if (!USE_PG || !row) return row;
 
   for (const key of Object.keys(row)) {
-    const value = row[key];
-    // 只转换纯数字字符串（bigint 的典型特征）
-    if (typeof value === 'string' && value !== '' && /^-?\d+$/.test(value)) {
-      const num = Number(value);
-      if (Number.isSafeInteger(num)) {
-        row[key] = num;
-      }
-    }
+    row[key] = toNumber(row[key]);
   }
   return row;
+}
+
+/**
+ * 把纯数字字符串转成 Number。
+ * PostgreSQL 的 bigint（int8）经 pg 驱动返回时是字符串，
+ * 转成 Number 后与 SQLite 模式行为一致。
+ */
+function toNumber(value) {
+  if (typeof value === 'string' && value !== '' && /^-?\d+$/.test(value)) {
+    const num = Number(value);
+    if (Number.isSafeInteger(num)) {
+      return num;
+    }
+  }
+  return value;
 }
 
 /**
@@ -299,7 +307,9 @@ function prepare(sql) {
 
         return {
           changes: res.rowCount,
-          lastInsertRowid: res.rows[0] ? res.rows[0].id : undefined,
+          // RETURNING id 拿到的是 bigint，pg 驱动会转成字符串，
+          // 这里转回 Number，与 SQLite 的 lastInsertRowid 行为保持一致
+          lastInsertRowid: res.rows[0] ? toNumber(res.rows[0].id) : undefined,
         };
       }
 
@@ -318,7 +328,7 @@ function prepare(sql) {
 async function healthCheck() {
   if (USE_PG) {
     const res = await getPgPool().query('SELECT 1 AS ok');
-    return res.rows[0].ok === 1;
+    return Number(res.rows[0].ok) === 1;
   }
   getSqliteDb().prepare('SELECT 1 AS ok').get();
   return true;
