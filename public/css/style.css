@@ -663,24 +663,25 @@ textarea:focus-visible {
 .btn-theme-toggle {
   background: var(--surface);
   border: 1px solid var(--border-color);
-  width: 52px;
+  width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 0;
   cursor: pointer;
   color: var(--text-secondary);
   transition: all var(--t-fast);
-  padding: 0 6px;
+  padding: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .btn-theme-toggle::after {
   content: '';
   position: absolute;
-  bottom: -2px;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   width: 0;
@@ -700,29 +701,50 @@ textarea:focus-visible {
   width: 60%;
 }
 
+/* 月亮/太阳图标：默认显示，悬停时淡出 */
 .btn-theme-toggle .theme-icon {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.3s ease;
+  transition: opacity 0.2s ease, transform 0.3s ease;
   flex-shrink: 0;
+  position: absolute;
 }
 
 .btn-theme-toggle .theme-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
+}
+
+/* 双向箭头：默认隐藏，悬停时淡入 */
+.btn-theme-toggle .theme-swap {
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.35s ease;
+  flex-shrink: 0;
+  position: absolute;
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.7);
+}
+
+.btn-theme-toggle .theme-swap svg {
+  width: 15px;
+  height: 15px;
 }
 
 .btn-theme-toggle:hover .theme-icon {
-  transform: rotate(15deg);
+  opacity: 0;
+  transform: rotate(90deg) scale(0.7);
 }
 
-.btn-theme-toggle .theme-label {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
+.btn-theme-toggle:hover .theme-swap {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
 }
 
 /* 主内容区 */

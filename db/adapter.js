@@ -204,6 +204,44 @@ function getSqliteDb() {
 // ---------------------------------------------------------------------------
 
 /**
+ * 归一化 PostgreSQL 返回的行数据。
+ *
+ * 背景：pg 驱动默认把 bigint（int8）转成字符串，以避免超出 JS 安全整数范围。
+ * 但 COUNT(*)、SUM() 等聚合函数在 PostgreSQL 中返回 bigint，
+ * 业务代码拿到的就是 "2" 这样的字符串，做算术会变成字符串拼接：
+ *   0 + "2" + "1" + "1"  =>  "0211"
+ *
+ * 本项目所有计数值都远小于 2^53，因此统一转成 Number 是安全的，
+ * 也让 PostgreSQL 模式与 SQLite 模式的行为保持一致。
+ */
+function normalizeRow(row) {
+  if (!USE_PG || !row) return row;
+
+  for (const key of Object.keys(row)) {
+    const value = row[key];
+    // 只转换纯数字字符串（bigint 的典型特征）
+    if (typeof value === 'string' && value !== '' && /^-?\d+$/.test(value)) {
+      const num = Number(value);
+      if (Number.isSafeInteger(num)) {
+        row[key] = num;
+      }
+    }
+  }
+  return row;
+}
+
+/**
+ * 批量归一化。
+ */
+function normalizeRows(rows) {
+  if (!USE_PG || !Array.isArray(rows)) return rows;
+  for (const row of rows) {
+    normalizeRow(row);
+  }
+  return rows;
+}
+
+/**
  * 执行一条不返回结果的语句（建表、索引等）。
  */
 async function exec(sql) {
@@ -228,7 +266,7 @@ function prepare(sql) {
 
       if (USE_PG) {
         const res = await getPgPool().query(finalSql, values);
-        return res.rows[0];
+        return normalizeRow(res.rows[0]);
       }
 
       return getSqliteDb().prepare(finalSql).get(...values);
@@ -239,7 +277,7 @@ function prepare(sql) {
 
       if (USE_PG) {
         const res = await getPgPool().query(finalSql, values);
-        return res.rows;
+        return normalizeRows(res.rows);
       }
 
       return getSqliteDb().prepare(finalSql).all(...values);

@@ -294,6 +294,18 @@ window.Visualization = (function () {
       container.innerHTML = '<div class="empty-tip"><p>暂无错题数据</p></div>';
       return;
     }
+
+    // 统一转成数字，避免后端返回字符串时出现 "0211" 这类拼接错误
+    data = data.map(item => ({
+      subject: item.subject,
+      count: Number(item.count) || 0,
+    })).filter(item => item.count > 0);
+
+    if (data.length === 0) {
+      container.innerHTML = '<div class="empty-tip"><p>暂无错题数据</p></div>';
+      return;
+    }
+
     renderCache.pie = { container, data };
     const colors = getColors();
 
@@ -314,6 +326,12 @@ window.Visualization = (function () {
 
       const largeArc = percentage > 0.5 ? 1 : 0;
       const color = colors.pie[index % colors.pie.length];
+
+      // 单一科目占满 100% 时，起止角重合会导致路径画不出来，改用整圆
+      if (percentage >= 0.9999) {
+        arcs += `<circle cx="${center}" cy="${center}" r="${(outerR + innerR) / 2}" fill="none" stroke="${color}" stroke-width="${outerR - innerR}"><title>${item.subject}：${item.count}题（100%）</title></circle>`;
+        return;
+      }
 
       const x1 = center + outerR * Math.cos(startAngle);
       const y1 = center + outerR * Math.sin(startAngle);
