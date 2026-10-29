@@ -14,9 +14,28 @@ const path = require('path');
 const STORAGE_TYPE = (process.env.STORAGE_TYPE || 'local').toLowerCase();
 const USE_SUPABASE = STORAGE_TYPE === 'supabase';
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const BUCKET = process.env.SUPABASE_BUCKET || 'mistake-images';
+
+/**
+ * 推导 Supabase 项目地址。
+ * 优先用 SUPABASE_URL；没配的话，从 DATABASE_URL 里解析项目标识自动拼接。
+ * 这样部署时少配一个环境变量，也少一处出错可能。
+ */
+function resolveSupabaseUrl() {
+  if (process.env.SUPABASE_URL) {
+    return process.env.SUPABASE_URL.replace(/\/$/, '');
+  }
+  const dbUrl = process.env.DATABASE_URL || '';
+  // 形如 postgresql://postgres.abcdefgh:密码@host:5432/postgres
+  const m = dbUrl.match(/\/\/[^.]+\.([a-z0-9]+):[^@]*@/i);
+  if (m && m[1]) {
+    return `https://${m[1]}.supabase.co`;
+  }
+  return '';
+}
+
+const SUPABASE_URL = resolveSupabaseUrl();
 
 // 本地存储目录
 const LOCAL_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
