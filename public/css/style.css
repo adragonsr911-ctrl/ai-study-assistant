@@ -2444,6 +2444,29 @@ textarea:focus-visible {
     padding: 16px;
   }
 
+  /* 窄栏下底部操作区改为竖向排列，避免主题按钮被挤出侧边栏 */
+  .sidebar-footer {
+    padding: 12px 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .sidebar-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .user-info {
+    justify-content: center;
+  }
+
+  .btn-theme-toggle {
+    width: 30px;
+    height: 30px;
+  }
+
   .form-row {
     flex-direction: column;
     gap: 0;
