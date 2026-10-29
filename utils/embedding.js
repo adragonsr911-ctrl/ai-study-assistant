@@ -5,6 +5,33 @@ const API_KEY = process.env.DOUBAO_API_KEY;
 const EMBEDDING_URL = 'https://ark.cn-beijing.volces.com/api/v3/embeddings';
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'doubao-embedding';
 
+// 服务可用性缓存：
+// 一旦检测到「模型不存在 / 无权限」这类永久性错误，就记住该状态，
+// 后续调用直接快速失败，避免每条数据都发起一次必然失败的请求、
+// 也避免把日志刷满红色报错。
+let permanentFailure = null;
+
+/**
+ * 判断错误是否为永久性失败（重试也不会成功）
+ */
+function isPermanentFailure(message) {
+  return /404|NotFound|does not exist|no access|InvalidEndpointOrModel/i.test(message);
+}
+
+/**
+ * 向量服务是否已确认不可用
+ */
+function isUnavailable() {
+  return permanentFailure !== null;
+}
+
+/**
+ * 获取当前不可用原因（供上层记录日志）
+ */
+function getUnavailableReason() {
+  return permanentFailure;
+}
+
 /**
  * 获取单条文本的向量
  * @param {string} text - 待向量化的文本
@@ -17,6 +44,11 @@ async function getEmbedding(text) {
 
   if (!API_KEY) {
     throw new Error('未配置API密钥');
+  }
+
+  // 已知服务不可用，直接快速失败，不再发起请求
+  if (permanentFailure) {
+    throw new Error('向量服务不可用（已缓存状态）: ' + permanentFailure);
   }
 
   const response = await fetch(EMBEDDING_URL, {
@@ -33,7 +65,12 @@ async function getEmbedding(text) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Embedding API请求失败: ${response.status} - ${errorText}`);
+    const message = `Embedding API请求失败: ${response.status} - ${errorText}`;
+    if (isPermanentFailure(message)) {
+      permanentFailure = `模型 ${EMBEDDING_MODEL} 不可用（${response.status}）`;
+      console.warn('⚠ ' + permanentFailure + '，RAG 语义检索将降级为关键词匹配（后续不再重试）');
+    }
+    throw new Error(message);
   }
 
   const data = await response.json();
@@ -117,5 +154,7 @@ function cosineSimilarity(vec1, vec2) {
 module.exports = {
   getEmbedding,
   getEmbeddings,
-  cosineSimilarity
+  cosineSimilarity,
+  isUnavailable,
+  getUnavailableReason,
 };

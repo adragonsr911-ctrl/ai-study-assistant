@@ -1,7 +1,8 @@
 // RAG检索增强生成：根据用户问题检索个人学习数据，注入AI上下文
 // 支持两种检索模式：语义检索（Embedding余弦相似度）和关键词匹配（降级方案）
 const db = require('../db');
-const { getEmbedding, cosineSimilarity } = require('./embedding');
+const embedding = require('./embedding');
+const { getEmbedding, cosineSimilarity } = embedding;
 
 // 学科关键词（用于关键词匹配降级）
 const SUBJECT_KEYWORDS = [
@@ -93,6 +94,11 @@ async function loadAllSourceData(userId) {
  * 对于没有向量的数据，实时生成并存储
  */
 async function ensureEmbeddings(userId) {
+  // 向量服务已确认不可用时直接跳过，避免无谓的数据库查询和重复失败
+  if (embedding.isUnavailable()) {
+    return;
+  }
+
   // 统计已有向量数量
   const countRow = await db.prepare('SELECT COUNT(*) as cnt FROM knowledge_embeddings WHERE user_id = ?').get(userId);
   const existingCount = countRow ? Number(countRow.cnt) : 0;
@@ -126,6 +132,11 @@ async function ensureEmbeddings(userId) {
         VALUES (?, ?, ?, ?, ?)
       `).run(userId, item.source_type, item.source_id, item.content_text, JSON.stringify(vector));
     } catch (e) {
+      // 服务永久不可用：首次失败时 embedding.js 已打印警告，这里静默停止，
+      // 不再对剩余条目重复请求（否则会产生大量重复日志和无效网络请求）
+      if (embedding.isUnavailable()) {
+        return;
+      }
       console.error(`生成向量失败 (${item.source_type}:${item.source_id}):`, e.message);
     }
   }
@@ -137,6 +148,12 @@ async function ensureEmbeddings(userId) {
  * 语义检索：基于Embedding余弦相似度检索最相关的学习数据
  */
 async function semanticRetrieval(userId, query) {
+  // 向量服务不可用时直接返回 null，由上层降级为关键词匹配，
+  // 避免每次对话都发起必然失败的请求
+  if (embedding.isUnavailable()) {
+    return null;
+  }
+
   // 1. 确保数据已向量化
   await ensureEmbeddings(userId);
 
@@ -302,7 +319,11 @@ async function retrieveContext(userId, query) {
       return semanticResult;
     }
   } catch (e) {
-    console.warn('RAG语义检索失败，降级为关键词匹配:', e.message);
+    // 服务不可用时 embedding.js 已打印过警告，这里不再重复输出完整错误，
+    // 只在可恢复的临时错误时提示
+    if (!embedding.isUnavailable()) {
+      console.warn('RAG语义检索失败，降级为关键词匹配:', e.message);
+    }
   }
 
   // 降级为关键词匹配
