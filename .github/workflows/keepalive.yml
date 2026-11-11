@@ -1,0 +1,27 @@
+name: 保活（防止 Supabase 免费项目因无活动被暂停）
+
+# 触发方式：
+#   1. 每 3 天 UTC 02:00 自动运行（北京时间 10:00）
+#   2. 可在 Actions 页面手动点击运行
+on:
+  schedule:
+    - cron: '0 2 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 执行保活探针
+        run: node scripts/keepalive.js
+        env:
+          KEEPALIVE_URL: https://ai-study-assistant-2aig.onrender.com
