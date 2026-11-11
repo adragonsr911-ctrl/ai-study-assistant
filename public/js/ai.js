@@ -390,6 +390,8 @@ const AI = {
   async loadKnowledgeGraph() {
     try {
       const data = await API.knowledge.getGraph();
+      // 缓存图谱数据，供布局切换时本地重绘使用
+      this.graphDataCache = data;
       const graphEl = document.getElementById('knowledge-graph');
       const statsEl = document.getElementById('graph-stats');
       const self = this;
@@ -442,11 +444,46 @@ const AI = {
   },
 
   // 切换图谱布局（环图/树图）
+  // 数据已在首次加载时缓存，切换布局只做本地重绘，不再请求后端，保证即时响应
   switchGraphLayout(layout) {
     this.currentGraphLayout = layout;
     document.querySelectorAll('#graph-layout-tabs .view-tab').forEach(t => t.classList.remove('active'));
-    document.querySelector(`#graph-layout-tabs .view-tab[data-layout="${layout}"]`).classList.add('active');
-    this.loadKnowledgeGraph();
+    const activeTab = document.querySelector(`#graph-layout-tabs .view-tab[data-layout="${layout}"]`);
+    if (activeTab) activeTab.classList.add('active');
+
+    if (this.graphDataCache && window.Visualization) {
+      this.renderGraphWithCache();
+    } else {
+      this.loadKnowledgeGraph();
+    }
+  },
+
+  // 用缓存数据重绘图谱（不经过网络）
+  renderGraphWithCache() {
+    const graphEl = document.getElementById('knowledge-graph');
+    const self = this;
+    if (!graphEl || !this.graphDataCache) return;
+
+    Visualization.renderKnowledgeGraph(graphEl, this.graphDataCache, {
+      layout: self.currentGraphLayout,
+      onNodeClick: (node) => {
+        if (node.type === 'knowledge' && node.detailId) {
+          API.knowledge.getDetail(node.detailId).then(detail => {
+            self.currentKnowledgeId = detail.knowledge.id;
+            document.getElementById('knowledge-result').style.display = 'block';
+            document.getElementById('knowledge-result').innerHTML = renderMD(detail.knowledge.content);
+          }).catch(() => showToast('加载知识点详情失败', 'error'));
+        } else if (node.type === 'mistake' && node.detailId) {
+          self.pendingMistakeId = node.detailId;
+          window.switchView('mistake');
+          showToast('已跳转到错题本查看：' + node.label, 'info');
+        } else if (node.type === 'subject') {
+          self.pendingSubjectFilter = node.label;
+          window.switchView('mistake');
+          showToast('已跳转到错题本，科目：' + node.label, 'info');
+        }
+      }
+    });
   },
 
   // 切换知识点视图（列表/图谱）
@@ -675,7 +712,7 @@ const AI = {
           <span class="subject-tag">${this.escapeHtml(m.subject)}</span>
           <span class="mastery-badge level-${m.mastery_level}" style="margin-left:8px;">${masteryLabels[m.mastery_level]}</span>
         </div>
-        ${m.image_path ? `<div class="mistake-detail-image"><img src="${this.resolveImageUrl(m.image_path)}" alt="错题图片"></div>` : ''}
+        ${m.image_path ? `<div class="mistake-detail-image"><img src="${m.image_url || this.resolveImageUrl(m.image_path)}" alt="错题图片" onerror="this.parentElement.style.display='none'"></div>` : ''}
         <div style="margin-bottom:16px;">
           <h4 style="margin-bottom:8px;color:var(--text-primary);">题目</h4>
           <p style="background:var(--surface);padding:12px;border-radius:8px;white-space:pre-wrap;">${this.escapeHtml(m.question)}</p>

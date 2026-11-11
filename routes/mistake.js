@@ -5,9 +5,25 @@ const authMiddleware = require('../middleware/auth');
 const { callDoubao, SYSTEM_PROMPTS } = require('../utils/doubao');
 const { updateStudyRecord } = require('../utils/studyRecord');
 const { recognizeMistakeImage } = require('../utils/vision');
+const storage = require('../utils/storage');
 const path = require('path');
 
 const router = express.Router();
+
+/**
+ * 把数据库里的图片文件名解析成前端可访问的完整地址。
+ *
+ * 背景：数据库统一存纯文件名（如 mistake-xxx.jpg）。本地模式下图片在 /uploads/，
+ * 生产模式下图片在 Supabase Storage 云端。若前端直接拼 /uploads/文件名，
+ * 云端部署时就会找不到图片，显示破图标。
+ */
+function withImageUrl(mistake) {
+  if (!mistake) return mistake;
+  return {
+    ...mistake,
+    image_url: mistake.image_path ? storage.getPublicUrl(mistake.image_path) : '',
+  };
+}
 
 // 艾宾浩斯遗忘曲线复习间隔（天）：完成当天首次复习后，依次在第1/2/4/7/15/30天复习
 const REVIEW_INTERVALS = [1, 2, 4, 7, 15, 30];
@@ -77,9 +93,9 @@ router.get('/', authMiddleware, async (req, res) => {
       `).all(req.user.id);
     }
 
-    // 附加复习状态标记
+    // 附加复习状态标记与可直接访问的图片地址
     mistakes = mistakes.map(m => ({
-      ...m,
+      ...withImageUrl(m),
       is_due: m.next_review_at != null && m.next_review_at <= today,
       review_completed: m.next_review_at == null,
     }));
@@ -105,7 +121,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: '错题不存在' });
     }
 
-    res.json({ mistake });
+    res.json({ mistake: withImageUrl(mistake) });
   } catch (error) {
     console.error('获取错题详情错误:', error);
     res.status(500).json({ error: '获取错题详情失败' });

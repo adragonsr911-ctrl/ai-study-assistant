@@ -136,8 +136,24 @@ async function uploadFile(buffer, originalName) {
 
 /**
  * 获取公开访问地址
+ * 兼容三种输入：纯文件名、/uploads/ 开头的旧路径、完整 URL
  */
-function getPublicUrl(filename) {
+function getPublicUrl(filenameOrPath) {
+  const ref = String(filenameOrPath || '').trim();
+  if (!ref) return '';
+
+  // 已是完整 URL：原样返回（可能是 Supabase 公开地址或其他云端地址）
+  if (ref.startsWith('http://') || ref.startsWith('https://')) {
+    return ref;
+  }
+
+  // 归一化出纯文件名
+  let filename = ref;
+  if (filename.includes('/uploads/')) {
+    filename = filename.split('/uploads/').pop();
+  }
+  filename = path.basename(filename.split('?')[0]);
+
   if (USE_SUPABASE) {
     return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${filename}`;
   }
