@@ -155,7 +155,7 @@ router.post('/send', authMiddleware, async (req, res) => {
     // 调用豆包API
     let aiReply;
     try {
-      aiReply = await callDoubao(aiMessages);
+      aiReply = await callDoubao(aiMessages, { max_tokens: 1500 });
     } catch (apiError) {
       // API调用失败，保存错误消息并返回
       aiReply = `抱歉，AI服务暂时不可用：${apiError.message}\n\n请检查API密钥配置后重试。`;

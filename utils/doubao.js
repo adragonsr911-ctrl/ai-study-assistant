@@ -11,6 +11,57 @@ const DOUBAO_BASE_URL = process.env.DOUBAO_BASE_URL || 'https://ark.cn-beijing.v
  * @param {Object} options - 可选参数
  * @returns {Promise<string>} - AI回复内容
  */
+/**
+ * 单次请求超时时间（毫秒）
+ * 火山方舟长文本生成较慢，给足时间，但不允许无限挂起
+ */
+const REQUEST_TIMEOUT_MS = 120000;
+
+/**
+ * 判断错误是否值得重试
+ * 网络错误与 5xx/429 属于偶发问题，重试通常能成功；
+ * 401/403（密钥问题）、400（参数问题）重试无意义。
+ */
+function isRetryable(status, message) {
+  if (status) {
+    if (status === 429) return true;
+    if (status >= 500) return true;
+    return false;
+  }
+  // 无状态码说明是网络层错误
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|network|timeout|aborted/i.test(message || '');
+}
+
+/**
+ * 发起一次带超时的请求
+ */
+async function requestOnce(body) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(DOUBAO_BASE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DOUBAO_API_KEY}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * 调用豆包大模型
+ * @param {Array} messages - 消息数组
+ * @param {Object} options - 可选参数
+ * @param {number} [options.maxTokens] - 最大输出 token
+ * @param {number} [options.retries] - 网络失败重试次数（默认 2，即最多尝试 3 次）
+ * @returns {Promise<string>} - AI回复内容
+ */
 async function callDoubao(messages, options = {}) {
   if (!DOUBAO_API_KEY || DOUBAO_API_KEY === '你的豆包API密钥') {
     throw new Error('请先在.env文件中配置DOUBAO_API_KEY');
@@ -36,58 +87,68 @@ async function callDoubao(messages, options = {}) {
     requestBody.thinking = { type: 'disabled' };
   }
 
-  try {
-    const response = await fetch(DOUBAO_BASE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DOUBAO_API_KEY}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+  const maxRetries = options.retries ?? 2;
+  let lastError = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API请求失败: ${response.status} - ${errorText}`);
-    }
+  // 网络抖动时自动重试，避免偶发失败直接暴露给用户
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await requestOnce(requestBody);
 
-    const data = await response.json();
-    const choice = data.choices && data.choices[0];
-    const message = choice && choice.message;
-    const content = (message && message.content) || '';
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err = new Error(`API请求失败: ${response.status} - ${errorText}`);
+        err.status = response.status;
+        // 4xx（除 429）属于请求本身有问题，重试无意义，直接抛出
+        if (!isRetryable(response.status, '')) throw err;
+        lastError = err;
+      } else {
+        const data = await response.json();
+        const choice = data.choices && data.choices[0];
+        const message = choice && choice.message;
+        const content = (message && message.content) || '';
 
-    // 防御：思考型模型可能把 token 全用在 reasoning_content 上，
-    // 导致 content 为空但 finish_reason=length。此时重试一次（关闭思考）。
-    if (!content.trim() && choice && choice.finish_reason === 'length') {
-      console.warn('模型输出被思考过程占满，关闭深度思考后重试一次');
-      const retryBody = { ...requestBody, thinking: { type: 'disabled' } };
-      const retryResp = await fetch(DOUBAO_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DOUBAO_API_KEY}`,
-        },
-        body: JSON.stringify(retryBody),
-      });
-      if (retryResp.ok) {
-        const retryData = await retryResp.json();
-        const retryContent = retryData.choices?.[0]?.message?.content || '';
-        if (retryContent.trim()) {
-          return retryContent;
+        // 防御：思考型模型可能把 token 全用在 reasoning_content 上，
+        // 导致 content 为空但 finish_reason=length。此时关闭思考重试一次。
+        if (!content.trim() && choice && choice.finish_reason === 'length') {
+          console.warn('模型输出被思考过程占满，关闭深度思考后重试');
+          const retryBody = { ...requestBody, thinking: { type: 'disabled' } };
+          const retryResp = await requestOnce(retryBody);
+          if (retryResp.ok) {
+            const retryData = await retryResp.json();
+            const retryContent = retryData.choices?.[0]?.message?.content || '';
+            if (retryContent.trim()) return retryContent;
+          }
+          throw new Error('模型未返回有效内容（输出长度不足），请稍后重试');
         }
+
+        if (!content.trim()) {
+          throw new Error('模型未返回内容');
+        }
+
+        return content;
       }
-      throw new Error('模型未返回有效内容（输出长度不足），请稍后重试');
+    } catch (error) {
+      lastError = error;
+      // 参数/密钥类错误不重试
+      if (error.status && !isRetryable(error.status, '')) {
+        console.error('豆包API调用错误（不重试）:', error.message);
+        throw error;
+      }
+      if (!isRetryable(error.status, error.message)) {
+        console.error('豆包API调用错误（不重试）:', error.message);
+        throw error;
+      }
+      if (attempt < maxRetries) {
+        const wait = 800 * Math.pow(2, attempt);
+        console.warn(`豆包API网络异常，${wait}ms 后重试（第 ${attempt + 2} 次尝试）: ${error.message}`);
+        await new Promise(r => setTimeout(r, wait));
+      }
     }
-
-    if (!content.trim()) {
-      throw new Error('模型未返回内容');
-    }
-
-    return content;
-  } catch (error) {
-    console.error('豆包API调用错误:', error.message);
-    throw error;
   }
+
+  console.error('豆包API调用错误（重试后仍失败）:', lastError && lastError.message);
+  throw lastError || new Error('豆包API调用失败');
 }
 
 // 各功能的系统提示词

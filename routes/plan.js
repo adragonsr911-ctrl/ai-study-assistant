@@ -95,7 +95,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
 
     let content;
     try {
-      content = await callDoubao(messages, { temperature: 0.5, max_tokens: 16000 });
+      content = await callDoubao(messages, { temperature: 0.5, max_tokens: 4000 });
     } catch (apiError) {
       return res.status(502).json({
         error: 'AI生成失败',

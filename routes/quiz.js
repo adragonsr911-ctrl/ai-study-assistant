@@ -74,7 +74,7 @@ ${mistakesContext ? `以下是该学生的错题情况，请针对这些薄弱�
     const aiContent = await callDoubao([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `请生成${numCount}道${subject}单项选择题。` }
-    ]);
+    ], { max_tokens: 3000 });
 
     // 解析JSON
     let questions = [];

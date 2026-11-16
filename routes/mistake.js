@@ -186,7 +186,7 @@ router.post('/add', authMiddleware, async (req, res) => {
     let similarQuestions = '';
 
     try {
-      const aiResult = await callDoubao(messages, { temperature: 0.6, max_tokens: 8000 });
+      const aiResult = await callDoubao(messages, { temperature: 0.6, max_tokens: 2500 });
       // 尝试分离分析和类似题（如果AI按格式输出了）
       const parts = aiResult.split('## 【类似练习题】');
       aiAnalysis = parts[0].trim();
