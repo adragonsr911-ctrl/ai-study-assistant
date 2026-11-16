@@ -6,11 +6,19 @@ const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
 const API_KEY = process.env.DOUBAO_API_KEY;
-const EMBEDDING_URL = 'https://ark.cn-beijing.volces.com/api/v3/embeddings';
-const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'doubao-embedding';
+
+// 向量接口地址。
+// 新版多模态向量模型（如 doubao-embedding-vision-251215）必须走
+// /api/v3/embeddings/multimodal 接口，标准 /embeddings 接口会报
+// "does not support this api"。可通过 EMBEDDING_BASE_URL 覆盖（例如指向中转代理）。
+const EMBEDDING_URL = process.env.EMBEDDING_BASE_URL
+  || 'https://ark.cn-beijing.volces.com/api/v3/embeddings/multimodal';
+
+// 默认使用当前可用的多模态向量模型
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'doubao-embedding-vision-251215';
 
 // 服务可用性缓存：
-// 一旦检测到「模型不存在 / 无权限」这类永久性错误，就记住该状态，
+// 一旦检测到「模型不存在 / 无权限 / 不支持该接口」这类永久性错误，就记住该状态，
 // 后续调用直接快速失败，避免每条数据都发起一次必然失败的请求、
 // 也避免把日志刷满红色报错。
 let permanentFailure = null;
@@ -19,7 +27,7 @@ let permanentFailure = null;
  * 判断错误是否为永久性失败（重试也不会成功）
  */
 function isPermanentFailure(message) {
-  return /404|NotFound|does not exist|no access|InvalidEndpointOrModel/i.test(message);
+  return /404|NotFound|does not exist|no access|InvalidEndpointOrModel|not support this api|InvalidParameter|ModelNotOpen/i.test(message || '');
 }
 
 /**
@@ -63,7 +71,8 @@ async function getEmbedding(text) {
     },
     body: JSON.stringify({
       model: EMBEDDING_MODEL,
-      input: text.substring(0, 8000)
+      // 多模态向量接口要求 input 为内容数组，文本用 { type: 'text', text } 形式
+      input: [{ type: 'text', text: String(text).substring(0, 8000) }]
     })
   });
 
@@ -78,8 +87,15 @@ async function getEmbedding(text) {
   }
 
   const data = await response.json();
-  if (data && data.data && data.data[0]) {
-    return data.data[0].embedding;
+
+  // 多模态接口返回 { data: { embedding: [...] } }；
+  // 标准接口返回 { data: [ { embedding: [...] } ] }。两种都兼容。
+  if (data && data.data) {
+    if (Array.isArray(data.data)) {
+      if (data.data[0] && data.data[0].embedding) return data.data[0].embedding;
+    } else if (data.data.embedding) {
+      return data.data.embedding;
+    }
   }
 
   throw new Error('Embedding API返回格式异常');
@@ -87,6 +103,9 @@ async function getEmbedding(text) {
 
 /**
  * 批量获取文本向量
+ *
+ * 注意：多模态向量接口会把多个输入融合成一个向量，无法用于逐条检索。
+ * 因此这里改为逐条调用，确保每条数据得到独立向量。
  * @param {string[]} texts - 待向量化的文本数组
  * @returns {Promise<number[][]>} - 向量数组
  */
@@ -95,35 +114,21 @@ async function getEmbeddings(texts) {
     return [];
   }
 
-  // 过滤空文本
-  const validTexts = texts.map(t => (t || '').substring(0, 8000)).filter(t => t.trim());
-  if (validTexts.length === 0) {
-    return texts.map(() => []);
+  const results = [];
+  for (const t of texts) {
+    if (!t || !t.trim()) {
+      results.push([]);
+      continue;
+    }
+    try {
+      results.push(await getEmbedding(t));
+    } catch (e) {
+      // 服务已确认不可用则停止后续尝试
+      if (permanentFailure) throw e;
+      results.push([]);
+    }
   }
-
-  const response = await fetch(EMBEDDING_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: validTexts
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Embedding API请求失败: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  if (data && data.data) {
-    return data.data.map(item => item.embedding);
-  }
-
-  throw new Error('Embedding API返回格式异常');
+  return results;
 }
 
 /**
