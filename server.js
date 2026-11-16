@@ -109,6 +109,49 @@ app.get('/api/health/ai-errors', (req, res) => {
   }
 });
 
+// 出站网络诊断（判断是整体网络问题还是特定服务不可达）
+app.get('/api/health/network-test', async (req, res) => {
+  const targets = [
+    { name: '火山方舟API', url: 'https://ark.cn-beijing.volces.com/api/v3/models' },
+    { name: '百度(境内)', url: 'https://www.baidu.com' },
+    { name: '腾讯云(境内)', url: 'https://cloud.tencent.com' },
+    { name: 'Supabase(项目)', url: (process.env.SUPABASE_URL || 'https://supabase.com') },
+    { name: 'GitHub(境外)', url: 'https://api.github.com' },
+  ];
+
+  const results = [];
+  for (const t of targets) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(t.url, {
+        method: 'GET',
+        signal: AbortSignal.timeout(15000),
+        headers: { 'User-Agent': 'dsh-health-check', ...(t.name === '火山方舟API' ? { Authorization: 'Bearer ' + (process.env.DOUBAO_API_KEY || '') } : {}) },
+      });
+      results.push({ name: t.name, ok: r.ok, status: r.status, ms: Date.now() - t0 });
+    } catch (e) {
+      results.push({
+        name: t.name,
+        ok: false,
+        ms: Date.now() - t0,
+        error: e.message,
+        causeCode: e.cause && e.cause.code,
+        causeName: e.cause && e.cause.name,
+      });
+    }
+  }
+
+  res.json({
+    region: process.env.RENDER_REGION || '(未知)',
+    nodeVersion: process.version,
+    dnsOrder: require('dns').getDefaultResultOrder(),
+    results,
+    verdict: results.every(r => r.ok)
+      ? '所有目标可达，网络正常'
+      : (results.filter(r => !r.ok).map(r => r.name).join('、') + ' 不可达'),
+  });
+});
+
 // 404处理
 app.use((req, res) => {
   res.status(404).json({ error: '接口不存在' });
