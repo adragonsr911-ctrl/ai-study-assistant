@@ -109,6 +109,41 @@ app.get('/api/health/ai-errors', (req, res) => {
   }
 });
 
+// 通用出站探测（诊断用）：GET /api/health/probe?url=<目标地址>
+// 用于从服务器侧验证某个外部地址是否可达
+app.get('/api/health/probe', async (req, res) => {
+  const target = req.query.url;
+  if (!target || typeof target !== 'string' || !/^https?:\/\//i.test(target)) {
+    return res.status(400).json({ error: '请提供合法的 url 参数（http:// 或 https:// 开头）' });
+  }
+
+  const timeout = Math.min(parseInt(req.query.timeout, 10) || 20000, 60000);
+  const t0 = Date.now();
+  try {
+    const r = await fetch(target, {
+      method: 'GET',
+      headers: { 'User-Agent': 'dsh-probe' },
+      signal: AbortSignal.timeout(timeout),
+    });
+    res.json({
+      url: target,
+      ok: r.ok,
+      status: r.status,
+      ms: Date.now() - t0,
+    });
+  } catch (e) {
+    res.json({
+      url: target,
+      ok: false,
+      ms: Date.now() - t0,
+      error: e.message,
+      causeName: e.cause && e.cause.name,
+      causeCode: e.cause && e.cause.code,
+      causeMessage: e.cause && e.cause.message,
+    });
+  }
+});
+
 // 出站网络诊断（判断是整体网络问题还是特定服务不可达）
 app.get('/api/health/network-test', async (req, res) => {
   const targets = [
