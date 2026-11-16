@@ -1,6 +1,10 @@
 // 火山方舟文本向量化（Embedding）API封装
 // 用于RAG语义检索
 
+const dns = require('dns');
+// 与其他火山方舟调用一致：优先 IPv4，规避云环境 IPv6 出站不通的问题
+dns.setDefaultResultOrder('ipv4first');
+
 const API_KEY = process.env.DOUBAO_API_KEY;
 const EMBEDDING_URL = 'https://ark.cn-beijing.volces.com/api/v3/embeddings';
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'doubao-embedding';

@@ -10,6 +10,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const dns = require('dns');
+
+// 与 utils/doubao.js 同理：云环境 IPv6 出站常不通，
+// 优先 IPv4 可避免 Supabase Storage 请求卡在 IPv6 上失败。
+dns.setDefaultResultOrder('ipv4first');
 
 const STORAGE_TYPE = (process.env.STORAGE_TYPE || 'local').toLowerCase();
 const USE_SUPABASE = STORAGE_TYPE === 'supabase';

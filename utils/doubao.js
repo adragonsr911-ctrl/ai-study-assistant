@@ -1,6 +1,16 @@
 // 豆包大模型API封装
 // 文档：https://www.volcengine.com/docs/82379
 
+const dns = require('dns');
+
+// 强制优先使用 IPv4。
+//
+// 背景：火山方舟域名 ark.cn-beijing.volces.com 同时有 A（IPv4）和 AAAA（IPv6）记录。
+// Node.js 18+ 默认按 DNS 返回顺序解析，会优先尝试 IPv6。而 Render 等云环境的
+// IPv6 出站链路往往不通或不稳定，导致连接先卡在 IPv6 上失败，表现为间歇性的
+// "fetch failed"，重试也难以恢复。显式指定 ipv4first 可彻底规避。
+dns.setDefaultResultOrder('ipv4first');
+
 const DOUBAO_API_KEY = process.env.DOUBAO_API_KEY;
 const DOUBAO_MODEL = process.env.DOUBAO_MODEL || 'doubao-1-5-lite-32k';
 const DOUBAO_BASE_URL = process.env.DOUBAO_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
@@ -87,7 +97,7 @@ async function callDoubao(messages, options = {}) {
     requestBody.thinking = { type: 'disabled' };
   }
 
-  const maxRetries = options.retries ?? 2;
+  const maxRetries = options.retries ?? 3;
   let lastError = null;
 
   // 网络抖动时自动重试，避免偶发失败直接暴露给用户
