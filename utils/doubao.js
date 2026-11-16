@@ -27,6 +27,36 @@ const DOUBAO_BASE_URL = process.env.DOUBAO_BASE_URL || 'https://ark.cn-beijing.v
  */
 const REQUEST_TIMEOUT_MS = 120000;
 
+// ---------------------------------------------------------------------------
+// 错误诊断记录
+// Node.js 的 fetch 只抛 "fetch failed"，真实原因藏在 error.cause 里
+// （如 ECONNRESET / ETIMEDOUT / ENOTFOUND / UND_ERR_SOCKET）。
+// 这里把最近若干次失败详情留在内存，供 /api/health/ai-errors 查看。
+// ---------------------------------------------------------------------------
+const recentErrors = [];
+const MAX_ERROR_RECORDS = 30;
+
+function recordError(error, extra = {}) {
+  const cause = error && error.cause;
+  recentErrors.push({
+    time: new Date().toISOString(),
+    message: error && error.message,
+    name: error && error.name,
+    status: error && error.status,
+    causeName: cause && cause.name,
+    causeCode: cause && cause.code,
+    causeErrno: cause && cause.errno,
+    causeSyscall: cause && cause.syscall,
+    causeMessage: cause && cause.message,
+    ...extra,
+  });
+  if (recentErrors.length > MAX_ERROR_RECORDS) recentErrors.shift();
+}
+
+function getRecentErrors() {
+  return recentErrors.slice();
+}
+
 /**
  * 判断错误是否值得重试
  * 网络错误与 5xx/429 属于偶发问题，重试通常能成功；
@@ -39,7 +69,7 @@ function isRetryable(status, message) {
     return false;
   }
   // 无状态码说明是网络层错误
-  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|network|timeout|aborted/i.test(message || '');
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|network|timeout|aborted|UND_ERR/i.test(message || '');
 }
 
 /**
@@ -157,7 +187,11 @@ async function callDoubao(messages, options = {}) {
     }
   }
 
-  console.error('豆包API调用错误（重试后仍失败）:', lastError && lastError.message);
+  // 重试全部失败：记录详细原因（含 error.cause），便于诊断
+  recordError(lastError, { phase: 'all-retries-failed', attempts: maxRetries + 1 });
+  console.error('豆包API调用错误（重试后仍失败）:',
+    lastError && lastError.message,
+    '| cause:', lastError && lastError.cause && (lastError.cause.code || lastError.cause.message));
   throw lastError || new Error('豆包API调用失败');
 }
 
@@ -277,4 +311,5 @@ const SYSTEM_PROMPTS = {
 module.exports = {
   callDoubao,
   SYSTEM_PROMPTS,
+  getRecentErrors,
 };

@@ -92,6 +92,23 @@ app.get('/api/health/ai', (req, res) => {
   });
 });
 
+// AI 调用失败详情（诊断用，不含密钥）
+app.get('/api/health/ai-errors', (req, res) => {
+  try {
+    const { getRecentErrors } = require('./utils/doubao');
+    const errors = getRecentErrors();
+    res.json({
+      count: errors.length,
+      errors,
+      note: errors.length === 0
+        ? '暂无失败记录（可能尚未发生失败，或服务近期重启导致内存记录清空）'
+        : '最近失败的调用详情，重点看 causeCode / causeSyscall',
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 404处理
 app.use((req, res) => {
   res.status(404).json({ error: '接口不存在' });
